@@ -492,10 +492,91 @@
 
 .adm-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 
+/* ---------------- insights ----------------
+   The comparison band is wider on the left because the lead card carries a
+   sentence ("was X last month") rather than a single figure. */
+.adm-cmp {
+    display: grid; grid-template-columns: 1.25fr 1fr 1fr;
+    gap: 18px; margin-bottom: 20px;
+}
+.adm-cmp .adm-kpi-sub { line-height: 1.5; }
+.adm-kpi-unit {
+    font-size: 16px; font-weight: 700; letter-spacing: 0; color: var(--a-muted);
+}
+.adm-kpi-lead .adm-kpi-unit { color: rgba(255, 255, 255, .82); }
+
+/* the change pill inside the lead card */
+.adm-vs {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 750;
+    padding: 4px 10px; border-radius: var(--a-pill); white-space: nowrap;
+}
+.adm-vs-up { background: var(--a-ok-wash); color: var(--a-ok); }
+.adm-vs-dn { background: #fdeceb; color: #c0322b; }
+.adm-vs-flat { background: var(--a-page-alt); color: var(--a-muted); }
+/* the washes vanish against the indigo lead card, so lighten them there */
+.adm-kpi-lead .adm-vs { background: rgba(255, 255, 255, .18); color: #fff; }
+.adm-kpi-lead .adm-vs-up { color: #c9ffdf; }
+.adm-kpi-lead .adm-vs-dn { color: #ffd7d3; }
+
+/* the change pill inside the movers tables */
+.adm-pill {
+    display: inline-block; padding: 3px 10px; border-radius: var(--a-pill);
+    font-size: 12px; font-weight: 750; white-space: nowrap;
+}
+.adm-pill-up { background: var(--a-ok-wash); color: var(--a-ok); }
+.adm-pill-dn { background: #fdeceb; color: #c0322b; }
+.adm-pill-flat { background: var(--a-page-alt); color: var(--a-muted); }
+
+/* "What stands out" - written signals */
+.adm-sig {
+    display: flex; gap: 14px; padding: 16px 0;
+    border-bottom: 1px solid var(--a-border);
+}
+.adm-sig:last-child { border-bottom: 0; padding-bottom: 0; }
+.adm-sig-ico {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: grid; place-items: center; flex: none;
+    background: var(--a-accent-wash); color: var(--a-accent);
+}
+.adm-sig-ico svg { width: 19px; height: 19px; }
+.adm-sig-bad .adm-sig-ico { background: #fdeceb; color: #c0322b; }
+.adm-sig-warn .adm-sig-ico { background: var(--a-warn-wash); color: var(--a-warn); }
+.adm-sig-info .adm-sig-ico { background: var(--a-accent-wash); color: var(--a-accent); }
+.adm-sig-body { flex: 1; min-width: 0; }
+.adm-sig-body b { display: block; font-size: 14px; font-weight: 780; margin-bottom: 4px; }
+.adm-sig-body p { font-size: 12.5px; color: var(--a-muted); line-height: 1.55; margin: 0; }
+.adm-sig-body em { font-style: normal; color: var(--a-ink); font-weight: 700; }
+
+/* "Worth checking" - pass / look rows */
+.adm-chk {
+    display: flex; align-items: flex-start; gap: 13px; padding: 15px 0;
+    border-bottom: 1px solid var(--a-border);
+}
+.adm-chk:last-child { border-bottom: 0; padding-bottom: 0; }
+.adm-chk-mark {
+    width: 30px; height: 30px; border-radius: 9px;
+    display: grid; place-items: center; flex: none; margin-top: 1px;
+}
+.adm-chk-mark svg { width: 16px; height: 16px; }
+.adm-chk-pass .adm-chk-mark { background: var(--a-ok-wash); color: var(--a-ok); }
+.adm-chk-look .adm-chk-mark { background: var(--a-warn-wash); color: var(--a-warn); }
+.adm-chk-text { flex: 1; min-width: 0; }
+.adm-chk-text b { display: block; font-size: 13.5px; font-weight: 750; margin-bottom: 3px; }
+.adm-chk-text p { font-size: 12.5px; color: var(--a-muted); line-height: 1.5; margin: 0; }
+.adm-chk-text em { font-style: normal; color: var(--a-ink); font-weight: 700; }
+.adm-chk-res {
+    font-size: 12px; font-weight: 800; padding: 4px 11px;
+    border-radius: var(--a-pill); flex: none; white-space: nowrap;
+}
+.adm-chk-pass .adm-chk-res { background: var(--a-ok-wash); color: var(--a-ok); }
+.adm-chk-look .adm-chk-res { background: var(--a-warn-wash); color: var(--a-warn); }
+
 /* ---------------- responsive ---------------- */
 @media (max-width: 1180px) {
     .adm-grid-3,
     .adm-grid-4,
+    .adm-cmp,
     .adm-upanel { grid-template-columns: repeat(2, 1fr); }
     .adm-grid-2,
     .adm-grid-32 { grid-template-columns: 1fr; }
@@ -511,9 +592,11 @@
     .adm-main { padding: 22px 18px 34px; }
     .adm-grid-3,
     .adm-grid-4,
+    .adm-cmp,
     .adm-upanel,
     .adm-row2,
     .adm-dstats { grid-template-columns: 1fr; }
+    .adm-chk-res { display: none; }
     .adm-share-col { width: auto; }
     .adm-table { font-size: 12.5px; }
     .adm-table th, .adm-table td { padding: 10px 8px; }
