@@ -242,6 +242,9 @@
 }
 .adm-ig-l { display: block; font-size: 11.5px; font-weight: 700; color: var(--a-muted); margin-top: 5px; }
 
+/* four across, for the Reports summary band */
+.adm-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+
 /* ---------------- tables ---------------- */
 .adm-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .adm-table th {
@@ -274,6 +277,21 @@
 .adm-role-user { background: var(--a-page-alt); color: var(--a-ink-soft); }
 .adm-role-admin { background: var(--a-accent-wash); color: var(--a-accent); }
 .adm-role-new { background: var(--a-warn-wash); color: var(--a-warn); }
+
+/* a bar and its percentage side by side, inside a table cell */
+.adm-share-col { width: 190px; }
+.adm-share { display: flex; align-items: center; gap: 10px; }
+.adm-share .adm-meter { flex: 1; margin-top: 0; min-width: 60px; }
+.adm-share b {
+    font-size: 12.5px; font-weight: 750; color: var(--a-muted);
+    width: 38px; text-align: right; font-variant-numeric: tabular-nums;
+}
+
+/* a ruled total row, so a report reads like a report */
+.adm-table tfoot td {
+    border-top: 2px solid var(--a-ink); border-bottom: 0;
+    font-weight: 800; padding-top: 15px;
+}
 
 /* ---------------- charts ---------------- */
 .adm-bars { display: flex; align-items: flex-end; gap: 12px; height: 160px; padding-top: 8px; }
@@ -477,6 +495,7 @@
 /* ---------------- responsive ---------------- */
 @media (max-width: 1180px) {
     .adm-grid-3,
+    .adm-grid-4,
     .adm-upanel { grid-template-columns: repeat(2, 1fr); }
     .adm-grid-2,
     .adm-grid-32 { grid-template-columns: 1fr; }
@@ -491,9 +510,11 @@
     .adm-side-foot { margin-top: 16px; }
     .adm-main { padding: 22px 18px 34px; }
     .adm-grid-3,
+    .adm-grid-4,
     .adm-upanel,
     .adm-row2,
     .adm-dstats { grid-template-columns: 1fr; }
+    .adm-share-col { width: auto; }
     .adm-table { font-size: 12.5px; }
     .adm-table th, .adm-table td { padding: 10px 8px; }
 }

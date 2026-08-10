@@ -66,3 +66,16 @@ const trimZero = (n) => {
     const rounded = Math.abs(n) >= 100 ? Math.round(n) : Number(n.toFixed(2));
     return String(rounded);
 };
+
+// Share of a total, as a display string. Whole numbers above 1%, one decimal
+// below it: with one dominant spender everybody else rounds to a flat "0%",
+// which reads as a bug when they have real money on the same row.
+export const shareLabel = (part, whole) => {
+    const total = Number(whole);
+    const value = Number(part);
+    if (!total || !value) return "0%";
+    const pct = (value / total) * 100;
+    if (pct >= 1) return `${Math.round(pct)}%`;
+    if (pct >= 0.1) return `${pct.toFixed(1)}%`;
+    return "<0.1%";
+};
