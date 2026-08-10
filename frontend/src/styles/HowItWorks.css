@@ -1,0 +1,44 @@
+.how-it-works-section {
+    padding: 80px 20px;
+    background: var(--page);
+    text-align: center;
+}
+
+.how-it-works-section h2 {
+    font-size: 48px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 50px;
+}
+
+.steps {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.step {
+    width: 300px;
+    background: #ffffff;
+    padding: 30px 20px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    transition: 0.3s;
+}
+
+.step:hover {
+    transform: translateY(-8px);
+}
+
+.step h3 {
+    color: var(--accent);
+    font-size: 22px;
+    margin-bottom: 15px;
+}
+
+.step p {
+    color: #555;
+    font-size: 16px;
+    line-height: 1.6;
+}

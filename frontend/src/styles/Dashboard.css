@@ -1,0 +1,822 @@
+/* ============================================================
+   Dashboard shell + shared UI.
+
+   Every rule is scoped under `.dash` so it cannot collide with the
+   landing-page styles in App.css, which already claim generic names
+   like .card and .stat-card. That collision was a real bug once:
+   App.css's global .stat-card turned the dashboard tiles into
+   120x100px blue boxes.
+
+   Palette comes from src/index.css so it matches the auth pages.
+   ============================================================ */
+
+/* rendered by ProtectedRoute, outside the dashboard shell */
+.route-loading {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 15px;
+    background: var(--page);
+}
+
+.dash {
+    min-height: 100vh;
+    background:
+        radial-gradient(1200px 420px at 12% -8%, var(--accent-wash), transparent 62%),
+        var(--page);
+    color: var(--ink);
+    font-family: var(--font);
+    text-align: left;
+}
+.dash *, .dash *::before, .dash *::after { box-sizing: border-box; }
+
+/* ---------- top bar ---------- */
+.dash .dash-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px clamp(16px, 4vw, 40px);
+    background: rgba(255, 255, 255, .82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.dash .dash-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--ink);
+}
+.dash .dash-brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: #fff;
+    font-size: 17px;
+}
+.dash .dash-brand-name {
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: .1em;
+}
+
+.dash .dash-user {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.dash .dash-user-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+.dash .dash-user-meta strong { font-weight: 700; }
+
+.dash .role-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    letter-spacing: .02em;
+    white-space: nowrap;
+}
+.dash .role-user  { background: var(--accent-wash); color: var(--accent); }
+.dash .role-admin { background: #fdf0e6; color: #9a4b06; }
+
+/* ---------- page heading ---------- */
+.dash .dash-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 30px clamp(16px, 4vw, 40px) 0;
+}
+.dash .dash-heading h1 {
+    margin: 0;
+    font-size: clamp(24px, 3.2vw, 33px);
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+.dash .dash-sub {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 14.5px;
+    max-width: 62ch;
+}
+.dash .dash-heading-actions { display: flex; gap: 10px; }
+
+/* ---------- tabs (admin only) ---------- */
+.dash .dash-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 22px clamp(16px, 4vw, 40px) 0;
+}
+.dash .dash-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.dash .dash-tab:hover { border-color: var(--accent-line); color: var(--accent); }
+.dash .dash-tab-active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+}
+.dash .dash-tab-active:hover { color: #fff; }
+
+.dash .count-pill {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: 6px;
+    border-radius: var(--r-pill);
+    background: var(--bad);
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 800;
+}
+.dash .dash-tab-active .count-pill { background: #fff; color: var(--ink); }
+.dash h3 .count-pill { background: var(--accent); }
+
+/* ---------- body ---------- */
+.dash .dash-body {
+    padding: 22px clamp(16px, 4vw, 40px) 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.dash .page-note {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+/* ---------- stat cards ---------- */
+.dash .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+}
+.dash .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 18px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    /* Declared explicitly, not left to defaults. Any generic `.stat-card` rule
+       elsewhere in the app would otherwise show through for exactly the
+       properties this block forgot to mention - which is how these tiles once
+       ended up as 120x100 boxes with centred, clipped text. */
+    width: auto;
+    height: auto;
+    align-items: stretch;
+    justify-content: flex-start;
+    color: var(--ink);
+    text-align: left;
+}
+/* A 3px rail rather than a tinted background, so four coloured tiles in a row
+   still read as one set instead of four unrelated blocks. */
+.dash .stat-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--border);
+}
+.dash .stat-card.tone-accent::before { background: var(--accent); }
+.dash .stat-card.tone-ok::before     { background: var(--ok); }
+.dash .stat-card.tone-warn::before   { background: var(--warn); }
+.dash .stat-card.tone-bad::before    { background: var(--bad); }
+
+.dash .stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.dash .stat-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.dash .stat-icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--page-alt);
+    color: var(--ink-soft);
+    font-size: 15px;
+    flex: none;
+}
+.dash .tone-accent .stat-icon { background: var(--accent-wash); color: var(--accent); }
+.dash .tone-ok .stat-icon     { background: var(--ok-wash);     color: var(--ok); }
+.dash .tone-warn .stat-icon   { background: var(--warn-wash);   color: var(--warn); }
+.dash .tone-bad .stat-icon    { background: var(--bad-wash);    color: var(--bad); }
+
+.dash .stat-value {
+    font-size: clamp(21px, 2.4vw, 27px);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    word-break: break-word;
+}
+.dash .stat-sub { font-size: 12.5px; color: var(--muted); }
+
+/* ---------- panels ---------- */
+.dash .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    min-width: 0;
+}
+.dash .panel h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 750;
+    display: flex;
+    align-items: center;
+}
+.dash .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.dash .panel-head-stack { align-items: flex-start; flex-direction: column; }
+.dash .panel-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.dash .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+/* ---------- monthly trend ---------- */
+.dash .trend {
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(6px, 2vw, 18px);
+    height: 190px;
+    padding-top: 6px;
+}
+.dash .trend-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    gap: 6px;
+}
+.dash .trend-value {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 6px;
+    white-space: nowrap;
+}
+/* Column, bottom-aligned: the bar grows upwards from the baseline and the
+   amount label above it rides up with it. */
+.dash .trend-bar-wrap {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+}
+.dash .trend-bar {
+    width: min(100%, 46px);
+    flex: none;
+    border-radius: 8px 8px 4px 4px;
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-line);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    transition: filter .15s;
+}
+.dash .trend-bar:hover { filter: brightness(.97); }
+.dash .trend-bar-solid {
+    background: linear-gradient(180deg, #6d67ea, var(--accent));
+    border-color: var(--accent);
+}
+.dash .trend-label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+
+/* ---------- donut ---------- */
+.dash .donut-wrap {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.dash .donut {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    flex: none;
+}
+.dash .donut svg { width: 100%; height: 100%; display: block; }
+.dash .donut-centre {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    pointer-events: none;
+}
+.dash .donut-centre-label {
+    display: block;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+}
+.dash .donut-centre-value {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash .donut-legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1 1 190px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+.dash .donut-legend li {
+    display: grid;
+    grid-template-columns: 11px 1fr auto auto;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+}
+.dash .legend-dot { width: 11px; height: 11px; border-radius: 50%; }
+.dash .legend-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-soft);
+}
+.dash .legend-pct { font-size: 12px; color: var(--muted); font-weight: 700; }
+.dash .legend-value { font-weight: 650; }
+
+/* ---------- category bars (admin insights) ---------- */
+.dash .breakdown { list-style: none; margin: 0; padding: 0; }
+.dash .breakdown li + li { margin-top: 14px; }
+.dash .breakdown-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13.5px;
+    margin-bottom: 6px;
+}
+.dash .breakdown-name { font-weight: 650; }
+.dash .breakdown-value { font-weight: 650; }
+.dash .breakdown-track {
+    height: 8px;
+    border-radius: var(--r-pill);
+    background: var(--page-alt);
+    overflow: hidden;
+}
+.dash .breakdown-fill {
+    height: 100%;
+    border-radius: var(--r-pill);
+    background: linear-gradient(90deg, var(--accent), #6d67ea);
+}
+.dash .breakdown-count { font-size: 11.5px; color: var(--muted); }
+
+/* ---------- top spenders ---------- */
+.dash .spenders { list-style: none; margin: 0; padding: 0; counter-reset: rank; }
+.dash .spenders li {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+.dash .spenders li + li { margin-top: 16px; }
+.dash .spender-rank {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--page-alt);
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 800;
+    margin-top: 1px;
+}
+.dash .spenders li:first-child .spender-rank { background: var(--accent); color: #fff; }
+.dash .spender-body { flex: 1; min-width: 0; }
+.dash .spender-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+.dash .spender-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    min-width: 0;
+}
+.dash .spender-name strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash .spender-value { font-size: 13.5px; font-weight: 700; }
+.dash .spender-sub { display: block; font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+
+
+/* ---------- tables ---------- */
+.dash .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+.dash .expense-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    /* Wider than most phones on purpose: the wrapper scrolls horizontally, and
+       a table squeezed into 360px wraps every cell into an unreadable column. */
+    min-width: 720px;
+}
+.dash .expense-table th {
+    text-align: left;
+    padding: 11px 14px;
+    background: var(--page-alt);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.dash .expense-table td {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    vertical-align: middle;
+}
+.dash .expense-table tbody tr:hover { background: var(--field); }
+.dash .expense-table .right { text-align: right; }
+.dash .expense-table .nowrap { white-space: nowrap; }
+.dash .muted-cell { color: var(--muted-soft); }
+.dash .mono { font-variant-numeric: tabular-nums; font-weight: 650; }
+
+.dash .title-cell strong { display: block; font-weight: 650; }
+.dash .title-cell small {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.dash .owner-cell { display: flex; align-items: center; gap: 10px; }
+.dash .owner-cell strong { display: block; font-weight: 650; }
+.dash .owner-cell small { display: block; color: var(--muted); font-size: 11.5px; }
+
+.dash .cat-chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    background: var(--accent-wash);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+
+.dash .action-row, .dash .confirm-row {
+    display: inline-flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+/* ---------- chips / filters ---------- */
+.dash .filter-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+.dash .filter-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.dash .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.dash .chip:hover { border-color: var(--accent-line); color: var(--accent); }
+.dash .chip-soft { font-weight: 600; color: var(--muted); }
+.dash .chip-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.dash .chip-active:hover { color: #fff; }
+.dash .chip-count {
+    font-size: 11px;
+    font-weight: 800;
+    opacity: .7;
+}
+
+/* Dropdowns + the period total, on one line beside the table heading. */
+.dash .table-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* The running total for the selected period, shown next to the filters. */
+.dash .period-note {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--r-sm);
+    padding: 8px 12px;
+    display: inline-block;
+    white-space: nowrap;
+}
+.dash .period-note strong { color: var(--accent); font-weight: 750; }
+
+.dash .select-inline {
+    display: inline-flex;
+    /* .dash label sets flex-direction: column for the form fields; these are
+       toolbar controls, so put the label text back beside the dropdown. */
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--muted);
+}
+.dash .select-inline select {
+    padding: 6px 10px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--ink);
+}
+
+/* ---------- forms ---------- */
+.dash .expense-form, .dash .team-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.dash .team-form {
+    border: 1px dashed var(--accent-line);
+    border-radius: var(--r-md);
+    padding: 16px;
+    margin-bottom: 18px;
+    background: var(--field);
+}
+.dash .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+.dash label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-soft);
+}
+.dash input, .dash select, .dash textarea {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 400;
+    background: var(--surface);
+    color: var(--ink);
+    width: 100%;
+}
+.dash textarea { resize: vertical; }
+.dash input:focus, .dash select:focus, .dash textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.dash .optional { font-weight: 400; color: var(--muted-soft); }
+.dash .form-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.dash .form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- buttons ---------- */
+.dash .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 16px;
+    border-radius: var(--r-sm);
+    border: 1px solid transparent;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s, transform .1s;
+}
+.dash .btn:active { transform: translateY(1px); }
+.dash .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+.dash .btn-primary { background: var(--accent); color: #fff; }
+.dash .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.dash .btn-lg { padding: 12px 20px; font-size: 14.5px; border-radius: var(--r-md); }
+
+.dash .btn-ghost {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--ink-soft);
+}
+.dash .btn-ghost:hover:not(:disabled) { border-color: var(--accent-line); color: var(--accent); }
+
+.dash .btn-tiny { padding: 6px 11px; font-size: 12.5px; }
+
+
+.dash .btn-danger {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--bad);
+}
+.dash .btn-danger:hover:not(:disabled) { background: var(--bad-wash); border-color: var(--bad); }
+
+/* ---------- alerts / empty states ---------- */
+.dash .alert {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 14px;
+    border-radius: var(--r-sm);
+    font-size: 13.5px;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+.dash .alert-error { background: var(--bad-wash);  color: var(--bad);  border-color: #f6cfcc; }
+.dash .alert-warn  { background: var(--warn-wash); color: var(--warn); border-color: #f3dfb6; }
+.dash .alert-ok    { background: var(--ok-wash);   color: var(--ok);   border-color: #c6e8d5; }
+
+.dash .empty-state {
+    padding: 34px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13.5px;
+    background: var(--field);
+    border: 1px dashed var(--border);
+    border-radius: var(--r-md);
+}
+
+/* ---------- drawer ---------- */
+.dash .drawer-root { position: fixed; inset: 0; z-index: 60; }
+.dash .drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, .45);
+    animation: drawer-fade .16s ease-out;
+}
+.dash .drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(460px, 100%);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    animation: drawer-in .2s ease-out;
+}
+.dash .drawer:focus { outline: none; }
+.dash .drawer-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 22px 22px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.dash .drawer-head h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -.01em;
+}
+.dash .drawer-sub { margin: 5px 0 0; font-size: 13px; color: var(--muted); }
+.dash .drawer-close {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: 17px;
+    cursor: pointer;
+}
+.dash .drawer-close:hover { border-color: var(--accent-line); color: var(--accent); }
+.dash .drawer-body { padding: 22px; overflow-y: auto; flex: 1; }
+
+@keyframes drawer-in  { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes drawer-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .dash .drawer, .dash .drawer-backdrop { animation: none; }
+    .dash .btn { transition: none; }
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 720px) {
+    .dash .dash-topbar { flex-wrap: wrap; }
+    .dash .dash-brand-name { font-size: 12.5px; }
+    .dash .dash-heading { align-items: flex-start; flex-direction: column; }
+    .dash .dash-heading-actions { width: 100%; }
+    .dash .dash-heading-actions .btn { width: 100%; justify-content: center; }
+    .dash .donut-wrap { justify-content: center; }
+        .dash .dash-user-meta strong { display: none; }
+}

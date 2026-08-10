@@ -1,0 +1,14 @@
+{
+  "name": "expense-tracker-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Expense Tracker - run `npm run setup` once, then `npm start`",
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "node dev.js",
+    "dev": "node dev.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

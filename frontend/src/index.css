@@ -1,0 +1,52 @@
+/* ============================================================
+   Global base + design tokens.
+   Kept here (rather than a separate tokens file) so the folder
+   layout stays as it was. Change a colour here and the landing
+   page, auth pages and dashboards all follow.
+   ============================================================ */
+:root {
+  /* ink */
+  --ink:        #0f172a;
+  --ink-soft:   #334155;
+  --muted:      #64748b;
+  --muted-soft: #94a3b8;
+
+  /* accent */
+  --accent:       #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-wash:  #eef0fe;
+  --accent-line:  #dcdffb;
+
+  /* surfaces */
+  --page:     #f7f8fd;
+  --page-alt: #eef0fa;
+  --surface:  #ffffff;
+  --border:   #e6e9f2;
+  --field:    #fbfcfe;
+
+  /* semantic */
+  --ok:       #0f8a4c;
+  --ok-wash:  #e8f6ee;
+  --warn:     #a86300;
+  --warn-wash:#fff5e2;
+  --bad:      #c0322b;
+  --bad-wash: #fdeceb;
+
+  /* shape */
+  --r-sm:  10px;
+  --r-md:  14px;
+  --r-lg:  20px;
+  --r-xl:  26px;
+  --r-pill: 999px;
+
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, .06);
+  --shadow-lg: 0 18px 50px rgba(15, 23, 42, .10);
+
+  --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+    scroll-behavior: smooth;
+}

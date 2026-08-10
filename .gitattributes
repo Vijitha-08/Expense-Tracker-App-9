@@ -1,0 +1,19 @@
+# Normalise line endings so Windows and macOS/Linux contributors do not fight
+# over CRLF vs LF. Without this, git on Windows reports every file as modified
+# the moment it is checked out ("warning: LF will be replaced by CRLF").
+* text=auto eol=lf
+
+# Binary files must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Keep generated lockfiles out of diffs and merge conflicts on GitHub.
+package-lock.json -diff linguist-generated=true
