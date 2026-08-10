@@ -9,7 +9,7 @@ import CategoryDonut from "../components/CategoryDonut";
 import ExpenseTable from "../components/ExpenseTable";
 import ExpenseDrawer from "../components/ExpenseDrawer";
 import { useAuth } from "../context/useAuth";
-import { money, currentMonthKey, percent } from "../services/format";
+import { money, currentMonthKey, percent, movementWords } from "../services/format";
 import * as svc from "../services/expenseService";
 
 const loadAll = () =>
@@ -137,10 +137,8 @@ const UserDashboard = () => {
     // Month-on-month movement, phrased in plain words. Only shown when there is
     // a previous month to compare against - "up 100%" from nothing is noise.
     const trendNote = useMemo(() => {
-        if (!thisMonth || !lastMonth || !lastMonth.total) return "Compared to last month";
-        const delta = percent(thisMonth.total - lastMonth.total, lastMonth.total);
-        if (delta === 0) return "Level with last month";
-        return delta > 0 ? `${delta}% more than last month` : `${Math.abs(delta)}% less than last month`;
+        if (!thisMonth || !lastMonth) return "Compared to last month";
+        return movementWords(thisMonth.total, lastMonth.total);
     }, [thisMonth, lastMonth]);
 
     const topCategory = categories[0];

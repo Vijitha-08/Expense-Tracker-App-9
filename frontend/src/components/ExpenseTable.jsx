@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
-import { money, shortDate } from "../services/format";
+import { money, prettyDate } from "../services/format";
 
 // `showOwner` turns this into the admin's all-expenses table; without it, it is
 // the owner's own list. One component means the two views cannot drift apart
@@ -38,7 +38,7 @@ const ExpenseTable = ({
 
                         return (
                             <tr key={e.id}>
-                                <td className="nowrap">{shortDate(e.expense_date)}</td>
+                                <td className="nowrap">{prettyDate(e.expense_date)}</td>
 
                                 {showOwner && (
                                     <td>

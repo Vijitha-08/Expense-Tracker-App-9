@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FiUserPlus, FiShield, FiUser, FiAlertCircle, FiCheckCircle } from "react-icons/fi";
-import { money, shortDate } from "../services/format";
+import { money, prettyDate } from "../services/format";
 
 // Admin-only. This panel is why open admin self-registration can stay closed
 // after the first account: a real admin adds the rest from here.
@@ -127,7 +127,7 @@ const TeamPanel = ({ people, admins, onAdd }) => {
                                         <FiShield aria-hidden="true" /> Admin
                                     </span>
                                 </td>
-                                <td className="nowrap">{shortDate(a.created_at)}</td>
+                                <td className="nowrap">{prettyDate(a.created_at)}</td>
                                 {/* Admins oversee expenses, they do not file them,
                                     so there is nothing to count here. */}
                                 <td className="right muted-cell">—</td>
@@ -153,7 +153,7 @@ const TeamPanel = ({ people, admins, onAdd }) => {
                                         <FiUser aria-hidden="true" /> User
                                     </span>
                                 </td>
-                                <td className="nowrap">{shortDate(p.created_at)}</td>
+                                <td className="nowrap">{prettyDate(p.created_at)}</td>
                                 <td className="right mono">{p.count}</td>
                                 <td className="right mono">{money(p.total)}</td>
                             </tr>

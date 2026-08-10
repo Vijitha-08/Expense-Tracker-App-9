@@ -14,7 +14,37 @@ export const moneyShort = (n) => {
     return `₹${Math.round(v)}`;
 };
 
-export const shortDate = (value) => String(value).slice(0, 10);
+// The user-facing tables were printing the raw column value - "2026-08-07" -
+// while every admin page showed "07 Aug 2026". Same app, two date formats.
+// Built from the string parts rather than new Date(value) so the day cannot
+// slip backwards in a timezone behind UTC.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export const prettyDate = (value) => {
+    const iso = String(value ?? "").slice(0, 10);
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d} ${MONTHS[Number(m) - 1] || "?"} ${y}`;
+};
+
+// Month-on-month movement in words. Percentages stop being readable past about
+// tenfold - "12995% more than last month" reads as a broken counter - so past
+// 10x this switches to a multiplier. Same rule as changeLabel() in
+// services/compare.js, which does the equivalent job for the Insights pills.
+export const movementWords = (now, before) => {
+    const a = Number(now) || 0;
+    const b = Number(before) || 0;
+    if (!b) return "Compared to last month";
+    const ratio = a / b;
+    if (ratio >= 10) return `${Math.round(ratio)}× more than last month`;
+    if (ratio > 0 && ratio <= 0.1) return `${Math.round(1 / ratio)}× less than last month`;
+    const pct = Math.round((ratio - 1) * 100);
+    if (pct === 0) return "Level with last month";
+    return pct > 0
+        ? `${pct}% more than last month`
+        : `${Math.abs(pct)}% less than last month`;
+};
 
 // "2026-08" -> "Aug 26". Built from the string parts rather than
 // new Date(value) so the label cannot slip a month backwards in timezones

@@ -472,8 +472,13 @@
     padding: 9px 17px; border-radius: var(--a-pill); border: 0; background: transparent;
     font: inherit; font-size: 13px; font-weight: 700; color: var(--a-muted); cursor: pointer;
 }
-.adm-tab-on, .adm-tab-on:hover { background: var(--a-accent); color: #fff; }
+/* Order matters here. `.adm-tab:hover` and `.adm-tab-on:hover` have the same
+   specificity, so whichever is written last wins - and with the hover rule
+   last, putting the pointer on the tab you are already on painted indigo text
+   on an indigo pill and the label vanished. The active state must be declared
+   after the hover state, not before it. */
 .adm-tab:hover { color: var(--a-accent); }
+.adm-tab-on, .adm-tab-on:hover { background: var(--a-accent); color: #fff; }
 
 .adm-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .adm-fld { margin-bottom: 16px; }
@@ -610,6 +615,13 @@
 
 /* ---------------- responsive ---------------- */
 @media (max-width: 1180px) {
+    /* A seven-column report cannot honestly shrink to phone width, and headings
+       must not wrap, so something has to give. Let the PANEL scroll sideways
+       rather than the whole document: the sidebar, the summary cards and the
+       headings stay where they are and only the table moves. Without this the
+       page itself scrolled to 843px inside a 420px window. */
+    .adm-panel { overflow-x: auto; }
+
     .adm-grid-3,
     .adm-grid-4,
     .adm-cmp,
