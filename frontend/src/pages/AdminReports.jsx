@@ -267,7 +267,7 @@ const AdminReports = () => {
                                     <td>
                                         {p.topCategory
                                             ? <span className="adm-tag">{p.topCategory}</span>
-                                            : <span className="adm-zero">—</span>}
+                                            : <span className="adm-tag adm-tag-flat adm-zero">—</span>}
                                     </td>
                                     <td className={`adm-right adm-mono${p.entries === 0 ? " adm-zero" : ""}`}>
                                         {display.amount(p.total)}
@@ -289,7 +289,14 @@ const AdminReports = () => {
                                 <td className="adm-right adm-mono">{totalEntries}</td>
                                 <td className="adm-right adm-mono">—</td>
                                 <td className="adm-right adm-mono">{display.amount(biggestSingle)}</td>
-                                <td>{topCategory ? topCategory.category : "—"}</td>
+                                {/* wrapped so the total's category starts on the
+                                    same pixel as the pills above it, which carry
+                                    10px of their own padding */}
+                                <td>
+                                    <span className="adm-tag adm-tag-flat">
+                                        {topCategory ? topCategory.category : "—"}
+                                    </span>
+                                </td>
                                 <td className="adm-right adm-mono">{display.amount(gross)}</td>
                                 <td />
                             </tr>

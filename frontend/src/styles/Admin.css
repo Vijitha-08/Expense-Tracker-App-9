@@ -22,6 +22,10 @@
     --a-surface: #fff;
     --a-border: #e6e9f2;
     --a-field: #fbfcfe;
+    /* one step up from --a-border, for rules that need to divide rather than
+       just separate - a total row, a section break. Nothing here should reach
+       for --a-ink: at 1-2px a near-black line reads as a defect. */
+    --a-border-strong: #ccd4e4;
     --a-ok: #0f9d58;
     --a-ok-wash: #e7f6ee;
     --a-warn: #b45309;
@@ -250,13 +254,31 @@
 .adm-table th {
     text-align: left; padding: 9px 12px; background: var(--a-page-alt); color: var(--a-muted);
     font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+    white-space: nowrap;   /* "APPROX / MONTH" must not fold onto two lines */
+    vertical-align: middle;
 }
 .adm-table th:first-child { border-radius: var(--a-r-sm) 0 0 var(--a-r-sm); }
 .adm-table th:last-child { border-radius: 0 var(--a-r-sm) var(--a-r-sm) 0; }
 .adm-table td { padding: 13px 12px; border-bottom: 1px solid var(--a-border); }
 .adm-table tbody tr:last-child td { border-bottom: 0; }
 .adm-right { text-align: right; }
-.adm-mono { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* `.adm-table th` is (0,1,1) and `.adm-right` is only (0,1,0), so the element
+   selector was quietly winning and every numeric COLUMN HEADING sat on the left
+   while its figures sat on the right. These two rules put the heading back over
+   its own column. Do not drop them by "simplifying" the selector. */
+.adm-table th.adm-right,
+.adm-table tfoot td.adm-right { text-align: right; }
+
+/* Figures should never wrap mid-amount: "~₹55.42 L" breaking after the ₹ makes
+   a column look ragged even when it is perfectly aligned. */
+.adm-mono {
+    font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap;
+}
+
+/* Reading a wide row is easier with the row itself picking out. */
+.adm-table tbody tr { transition: background .12s ease; }
+.adm-table tbody tr:hover { background: var(--a-field); }
 .adm-dim { color: var(--a-muted); }
 .adm-zero { color: var(--a-muted-soft); }
 
@@ -273,6 +295,13 @@
     background: var(--a-accent-wash); color: var(--a-accent);
     font-size: 11.5px; font-weight: 700;
 }
+/* Same box as .adm-tag but no fill: used in a total row, where the value has to
+   line up with the pills above it without pretending to be one of them. */
+.adm-tag-flat {
+    background: transparent; color: var(--a-ink);
+    font-size: 13.5px; font-weight: 800;
+}
+
 .adm-role { display: inline-block; padding: 4px 11px; border-radius: var(--a-pill); font-size: 11.5px; font-weight: 750; }
 .adm-role-user { background: var(--a-page-alt); color: var(--a-ink-soft); }
 .adm-role-admin { background: var(--a-accent-wash); color: var(--a-accent); }
@@ -289,9 +318,16 @@
 
 /* a ruled total row, so a report reads like a report */
 .adm-table tfoot td {
-    border-top: 2px solid var(--a-ink); border-bottom: 0;
+    border-top: 1.5px solid var(--a-border-strong); border-bottom: 0;
     font-weight: 800; padding-top: 15px;
+    background: var(--a-field);
 }
+.adm-table tfoot td:first-child { border-radius: 0 0 0 var(--a-r-sm); }
+.adm-table tfoot td:last-child { border-radius: 0 0 var(--a-r-sm) 0; }
+/* The rule above used to be 2px of --a-ink (#0f172a) - near-black on a sheet
+   where every other border is #e6e9f2. It read as a bar struck through the
+   table rather than a division. Same job, one step up from the row dividers
+   instead of ten. */
 
 /* ---------------- charts ---------------- */
 .adm-bars { display: flex; align-items: flex-end; gap: 12px; height: 160px; padding-top: 8px; }

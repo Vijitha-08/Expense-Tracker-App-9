@@ -75,6 +75,11 @@ export const shareLabel = (part, whole) => {
     const value = Number(part);
     if (!total || !value) return "0%";
     const pct = (value / total) * 100;
+    // 99.98% rounded up to "100%" put a flat contradiction on the Insights card:
+    // "100% of this period comes from Ravi Kumar, out of 2 people spending".
+    // Only a genuine whole may print as 100%; anything short of it says so.
+    if (pct >= 100) return "100%";
+    if (pct > 99) return ">99%";
     if (pct >= 1) return `${Math.round(pct)}%`;
     if (pct >= 0.1) return `${pct.toFixed(1)}%`;
     return "<0.1%";
