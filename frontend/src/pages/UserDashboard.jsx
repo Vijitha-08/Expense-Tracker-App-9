@@ -167,7 +167,7 @@ const UserDashboard = () => {
     return (
         <DashboardLayout
             title={`Hi ${firstName(user?.name)}`}
-            subtitle="Track what you spend and see exactly where it goes."
+            subtitle="Track what you spend. Every figure here is exact, to the rupee."
             actions={
                 <button className="btn btn-primary btn-lg" onClick={openNew}>
                     <FiPlus aria-hidden="true" /> New expense

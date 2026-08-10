@@ -260,7 +260,8 @@ const AdminSettings = () => {
                         <FiInfo aria-hidden="true" />
                         Estimated amounts round to the nearest lakh or crore, so individual rows will
                         not add up to the total exactly. Turn the switch off when a figure has to be
-                        checked against a receipt.
+                        checked against a receipt. This setting covers the admin pages only —
+                        everybody always sees their own expenses to the rupee.
                     </p>
                 </div>
             )}

@@ -9,35 +9,40 @@
    ============================================================ */
 
 .adm {
-    --a-ink: #0f172a;
-    --a-ink-soft: #334155;
-    --a-muted: #64748b;
-    --a-muted-soft: #94a3b8;
-    --a-accent: #4f46e5;
-    --a-accent-hover: #4338ca;
-    --a-accent-wash: #eef0fe;
-    --a-accent-line: #dcdffb;
-    --a-page: #f7f8fd;
-    --a-page-alt: #eef0fa;
-    --a-surface: #fff;
-    --a-border: #e6e9f2;
-    --a-field: #fbfcfe;
-    /* one step up from --a-border, for rules that need to divide rather than
-       just separate - a total row, a section break. Nothing here should reach
-       for --a-ink: at 1-2px a near-black line reads as a defect. */
-    --a-border-strong: #ccd4e4;
-    --a-ok: #0f9d58;
-    --a-ok-wash: #e7f6ee;
-    --a-warn: #b45309;
-    --a-warn-wash: #fdf3e3;
-    --a-danger: #a8241d;
-    --a-navy: #151a30;
-    --a-r-sm: 10px;
-    --a-r-md: 14px;
-    --a-r-lg: 20px;
-    --a-pill: 999px;
-    --a-sh-sm: 0 1px 2px rgba(15, 23, 42, .05);
-    --a-sh-md: 0 4px 16px rgba(15, 23, 42, .07);
+    /* These are ALIASES, not values. Every one points at the single definition
+       in index.css. The `--a-` prefix stays because the scoping story below
+       depends on it, but the colours themselves must never be restated here:
+       when they were, --ok drifted to a different green, --warn to a different
+       amber and --danger to a different red, so the same meaning rendered two
+       ways depending on which half of the app you were looking at.
+       Change a colour in index.css and both halves follow. */
+    --a-ink: var(--ink);
+    --a-ink-soft: var(--ink-soft);
+    --a-muted: var(--muted);
+    --a-muted-soft: var(--muted-soft);
+    --a-accent: var(--accent);
+    --a-accent-hover: var(--accent-hover);
+    --a-accent-wash: var(--accent-wash);
+    --a-accent-line: var(--accent-line);
+    --a-page: var(--page);
+    --a-page-alt: var(--page-alt);
+    --a-surface: var(--surface);
+    --a-border: var(--border);
+    --a-border-strong: var(--border-strong);
+    --a-field: var(--field);
+    --a-ok: var(--ok);
+    --a-ok-wash: var(--ok-wash);
+    --a-warn: var(--warn);
+    --a-warn-wash: var(--warn-wash);
+    --a-danger: var(--bad);
+    --a-danger-wash: var(--bad-wash);
+    --a-navy: #151a30;   /* sidebar only; no counterpart on the user side */
+    --a-r-sm: var(--r-sm);
+    --a-r-md: var(--r-md);
+    --a-r-lg: var(--r-lg);
+    --a-pill: var(--r-pill);
+    --a-sh-sm: var(--shadow-sm);
+    --a-sh-md: var(--shadow-md);
 
     display: flex;
     min-height: 100vh;
@@ -214,7 +219,7 @@
 .adm-kpi-val-sm { font-size: 25px; }
 .adm-kpi-sub { font-size: 12.5px; color: var(--a-muted); }
 .adm-kpi-sub b { color: var(--a-ok); font-weight: 750; }
-.adm-kpi-sub b.adm-down { color: #c0322b; }
+.adm-kpi-sub b.adm-down { color: var(--a-danger); }
 
 .adm-kpi-lead {
     background: linear-gradient(120deg, #4f46e5, #6366f1);
@@ -380,16 +385,27 @@
 }
 .adm-note svg { width: 15px; height: 15px; flex: none; }
 .adm-note b { color: var(--a-accent); }
-.adm-empty { padding: 34px 12px; text-align: center; color: var(--a-muted); font-size: 13.5px; }
+/* This one goes the other way: the user side already drew empty states as a
+   dashed panel and the admin side used bare centred text, which reads as
+   "something failed to load" rather than "there is nothing here yet". The
+   better of the two treatments wins, so the admin side adopts it. Matches
+   `.dash .empty-state` in Dashboard.css. */
+.adm-empty {
+    padding: 34px 20px; text-align: center;
+    color: var(--a-muted); font-size: 13.5px;
+    background: var(--a-field);
+    border: 1px dashed var(--a-border);
+    border-radius: var(--a-r-md);
+}
 .adm-alert {
     display: flex; gap: 9px; align-items: center; font-size: 13px; font-weight: 650;
-    background: #fdf1f0; border: 1px solid #f3c9c5; color: #a8241d;
+    background: var(--a-danger-wash); border: 1px solid #f3c9c5; color: var(--a-danger);
     border-radius: var(--a-r-md); padding: 12px 15px; margin-bottom: 18px;
 }
 .adm-alert svg { width: 16px; height: 16px; flex: none; }
 .adm-ok-msg {
     display: flex; gap: 9px; align-items: center; font-size: 13px; font-weight: 650;
-    background: var(--a-ok-wash); border: 1px solid #bfe6cf; color: #0b7a45;
+    background: var(--a-ok-wash); border: 1px solid #bfe6cf; color: var(--a-ok);
     border-radius: var(--a-r-md); padding: 12px 15px; margin-bottom: 18px;
 }
 .adm-ok-msg svg { width: 16px; height: 16px; flex: none; }
@@ -553,7 +569,7 @@
     padding: 4px 10px; border-radius: var(--a-pill); white-space: nowrap;
 }
 .adm-vs-up { background: var(--a-ok-wash); color: var(--a-ok); }
-.adm-vs-dn { background: #fdeceb; color: #c0322b; }
+.adm-vs-dn { background: var(--a-danger-wash); color: var(--a-danger); }
 .adm-vs-flat { background: var(--a-page-alt); color: var(--a-muted); }
 /* the washes vanish against the indigo lead card, so lighten them there */
 .adm-kpi-lead .adm-vs { background: rgba(255, 255, 255, .18); color: #fff; }
@@ -566,7 +582,7 @@
     font-size: 12px; font-weight: 750; white-space: nowrap;
 }
 .adm-pill-up { background: var(--a-ok-wash); color: var(--a-ok); }
-.adm-pill-dn { background: #fdeceb; color: #c0322b; }
+.adm-pill-dn { background: var(--a-danger-wash); color: var(--a-danger); }
 .adm-pill-flat { background: var(--a-page-alt); color: var(--a-muted); }
 
 /* "What stands out" - written signals */
@@ -581,7 +597,7 @@
     background: var(--a-accent-wash); color: var(--a-accent);
 }
 .adm-sig-ico svg { width: 19px; height: 19px; }
-.adm-sig-bad .adm-sig-ico { background: #fdeceb; color: #c0322b; }
+.adm-sig-bad .adm-sig-ico { background: var(--a-danger-wash); color: var(--a-danger); }
 .adm-sig-warn .adm-sig-ico { background: var(--a-warn-wash); color: var(--a-warn); }
 .adm-sig-info .adm-sig-ico { background: var(--a-accent-wash); color: var(--a-accent); }
 .adm-sig-body { flex: 1; min-width: 0; }

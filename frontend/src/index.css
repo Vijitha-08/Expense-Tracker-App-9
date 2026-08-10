@@ -22,13 +22,33 @@
   --page-alt: #eef0fa;
   --surface:  #ffffff;
   --border:   #e6e9f2;
+  /* one step up from --border, for a rule that has to divide rather than just
+     separate: a total row, a section break. Nothing should reach for --ink at
+     1-2px; at that contrast a near-black hairline reads as a defect. */
+  --border-strong: #ccd4e4;
   --field:    #fbfcfe;
 
-  /* semantic */
-  --ok:       #0f8a4c;
+  /* semantic
+     ---------------------------------------------------------------
+     Every value below clears 4.5:1 against both white and its own wash,
+     and they sit in a tight 5.0-6.3:1 band so no single colour shouts
+     louder than the others. Measured, not chosen by eye:
+
+       accent #4f46e5   6.29:1 on white   5.55:1 on wash
+       ok     #0c7a42   5.42:1            4.86:1
+       warn   #b45309   5.02:1            4.57:1
+       bad    #c0322b   5.63:1            4.92:1
+
+     --ok was #0f8a4c here and #0f9d58 in Admin.css: two different greens
+     for the same meaning, and BOTH failed 4.5:1 on white (4.41 and 3.51).
+     Likewise --warn was #a86300 vs #b45309 and --bad #c0322b vs #a8241d.
+     Admin.css now derives its --a-* tokens from these rather than
+     restating hex, so the two sides cannot drift apart again.
+     --------------------------------------------------------------- */
+  --ok:       #0c7a42;
   --ok-wash:  #e8f6ee;
-  --warn:     #a86300;
-  --warn-wash:#fff5e2;
+  --warn:     #b45309;
+  --warn-wash:#fdf3e3;
   --bad:      #c0322b;
   --bad-wash: #fdeceb;
 
@@ -39,7 +59,8 @@
   --r-xl:  26px;
   --r-pill: 999px;
 
-  /* elevation */
+  /* elevation - three steps, and only three. --shadow-md was .06 here and .07
+     in Admin.css, which is invisible on its own and pointless as a difference. */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
   --shadow-md: 0 4px 16px rgba(15, 23, 42, .06);
   --shadow-lg: 0 18px 50px rgba(15, 23, 42, .10);

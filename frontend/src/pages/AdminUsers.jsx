@@ -118,7 +118,17 @@ const AdminUsers = () => {
                         <p className="adm-empty">Loading...</p>
                     ) : (
                         <>
-                            <div className="adm-list-grp">Administrators · {admins.length}</div>
+                            {/* The counts follow the search, and a group with
+                                nothing left in it disappears rather than sitting
+                                there as an empty heading. Searching for a name
+                                that matches nobody used to print
+                                "Administrators · 1" and "Users · 4" above a box
+                                saying nobody matched. */}
+                            {visibleAdmins.length > 0 && (
+                                <div className="adm-list-grp">
+                                    Administrators · {visibleAdmins.length}
+                                </div>
+                            )}
                             {visibleAdmins.map((p) => (
                                 <PersonRow
                                     key={p.id} person={p} selected={p.id === selectedId}
@@ -126,16 +136,22 @@ const AdminUsers = () => {
                                 />
                             ))}
 
-                            <div className="adm-list-grp">Users · {users.length}</div>
-                            {visibleUsers.length === 0 ? (
-                                <p className="adm-empty">Nobody matches that search.</p>
-                            ) : (
-                                visibleUsers.map((p) => (
-                                    <PersonRow
-                                        key={p.id} person={p} selected={p.id === selectedId}
-                                        onSelect={setSelectedId} display={display}
-                                    />
-                                ))
+                            {visibleUsers.length > 0 && (
+                                <div className="adm-list-grp">Users · {visibleUsers.length}</div>
+                            )}
+                            {visibleUsers.map((p) => (
+                                <PersonRow
+                                    key={p.id} person={p} selected={p.id === selectedId}
+                                    onSelect={setSelectedId} display={display}
+                                />
+                            ))}
+
+                            {visibleAdmins.length === 0 && visibleUsers.length === 0 && (
+                                <p className="adm-empty">
+                                    {query.trim()
+                                        ? `Nobody matches “${query.trim()}”.`
+                                        : "No accounts yet."}
+                                </p>
                             )}
                         </>
                     )}
