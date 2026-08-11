@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Features from "./components/Features";
 import LoginPage from "./pages/LoginPage";
 import RegisterChoice from "./pages/RegisterChoice";
+import ForgotPassword from "./pages/ForgotPassword";
 import UserRegister from "./pages/UserRegister";
 import AdminRegister from "./pages/AdminRegister";
 import UserDashboard from "./pages/UserDashboard";
@@ -42,6 +43,7 @@ function App() {
             <Route path="/features" element={<Features />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterChoice />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register/user" element={<UserRegister />} />
             <Route path="/register/admin" element={<AdminRegister />} />
 

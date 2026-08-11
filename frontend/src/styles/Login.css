@@ -422,6 +422,87 @@
 .auth-alert svg { flex: none; margin-top: 2px; font-size: 15px; }
 .auth-alert--error { background: var(--bad-wash); color: var(--bad); border-color: #f6cdca; }
 .auth-alert--warn  { background: var(--warn-wash); color: var(--warn); border-color: #f5dcae; }
+.auth-alert--ok    { background: var(--ok-wash);  color: var(--ok);  border-color: #bfe6cf; }
+
+/* ---------- forgot password ---------- */
+/* Sits on the same row as "Remember me", to the right. */
+.auth-forgot {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+}
+.auth-forgot:hover { text-decoration: underline; }
+
+/* The three steps of the reset, so it is obvious how much is left. */
+.auth-steps {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    list-style: none;
+    margin: 0 0 22px;
+    padding: 0;
+    flex-wrap: wrap;
+}
+.auth-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--muted-soft);
+    padding: 6px 12px 6px 6px;
+    border-radius: var(--r-pill);
+    background: var(--page-alt);
+}
+.auth-step span {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--r-pill);
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+}
+.auth-step--on { background: var(--accent-wash); color: var(--accent); }
+.auth-step--on span { background: var(--accent); color: #fff; }
+.auth-step--done { background: var(--ok-wash); color: var(--ok); }
+.auth-step--done span { background: var(--ok); color: #fff; }
+
+/* The code field: six digits, spaced out, so a mistyped digit is easy to spot. */
+.auth-code {
+    font-size: 22px !important;
+    font-weight: 800;
+    letter-spacing: .38em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* "Send another" has to be a button, not a link - it performs an action - but
+   it should read like the link beside it. */
+.auth-linkbtn {
+    border: 0;
+    background: none;
+    padding: 0;
+    margin-left: 5px;
+    font: inherit;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--accent);
+    cursor: pointer;
+}
+.auth-linkbtn:hover { text-decoration: underline; }
+.auth-linkbtn:disabled { opacity: .55; cursor: not-allowed; text-decoration: none; }
+
+.auth-linkback {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: 0 !important;
+    color: var(--muted) !important;
+}
+.auth-linkback svg { font-size: 14px; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1080px) {

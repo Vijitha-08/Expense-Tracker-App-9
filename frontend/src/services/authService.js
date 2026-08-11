@@ -32,6 +32,25 @@ export const fetchSetupState = async () => {
     return data;
 };
 
+// ---- forgot password ----------------------------------------------------
+// Three calls rather than one so a wrong code is caught before somebody types
+// a new password twice. The API deliberately never returns the code, and never
+// confirms whether the address has an account.
+export const requestResetCode = async (email) => {
+    const { data } = await api.post("/auth/forgot-password", { email });
+    return data;                    // { message, emailConfigured, delivered }
+};
+
+export const verifyResetCode = async ({ email, code }) => {
+    const { data } = await api.post("/auth/verify-reset-code", { email, code });
+    return data;
+};
+
+export const resetPassword = async ({ email, code, newPassword }) => {
+    const { data } = await api.post("/auth/reset-password", { email, code, newPassword });
+    return data;
+};
+
 export const logout = () => {
     clearStored(TOKEN_KEY);
     clearStored(USER_KEY);

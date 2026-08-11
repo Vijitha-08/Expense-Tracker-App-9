@@ -119,4 +119,149 @@ const setupState = async (req, res) => {
     }
 };
 
-module.exports = { register, login, me, setupState };
+/* ============================================================
+   Forgot password - email a one-time code, verify it, set a new password.
+   ============================================================
+   Three rules shape all of this, and they are why it is longer than the happy
+   path would need:
+
+   1. The reply NEVER says whether the address has an account. "If that address
+      has an account, a code is on its way" comes back either way. An endpoint
+      that answers "no such user" is a free tool for working out who is
+      registered.
+
+   2. The code is stored as a bcrypt hash, never in plaintext. It is a
+      short-lived password, so it gets a password's treatment.
+
+   3. Six digits is only a million guesses, which is worthless without a
+      ceiling. Five wrong attempts burn the code, and a new one cannot be
+      requested more than once a minute.
+   ============================================================ */
+const crypto = require("crypto");
+const { createCode, latestFor, countAttempt, markUsed, purgeOld } = require("../models/resetModel");
+const { sendResetCode, mailConfigured } = require("../services/mailer");
+const db = require("../config/db");
+
+const CODE_MINUTES = 10;
+const MAX_ATTEMPTS = 5;
+const RESEND_SECONDS = 60;
+const VAGUE = "If that address has an account, a reset code is on its way.";
+
+// randomInt, not Math.random: this is a credential.
+const newCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+
+const forgotPassword = async (req, res) => {
+    const email = (req.body.email || "").trim().toLowerCase();
+    try {
+        if (!EMAIL_RE.test(email)) {
+            return res.status(400).json({ message: "Please enter a valid email address" });
+        }
+
+        const user = await findUserByEmail(email);
+        if (!user) return res.json({ message: VAGUE, emailConfigured: mailConfigured() });
+
+        const outstanding = await latestFor(user.id);
+        if (outstanding && !outstanding.used_at) {
+            const age = (Date.now() - new Date(outstanding.created_at).getTime()) / 1000;
+            if (age < RESEND_SECONDS) {
+                return res.status(429).json({
+                    message: `A code was just sent. Wait ${Math.ceil(RESEND_SECONDS - age)} seconds before asking for another.`,
+                });
+            }
+        }
+
+        const code = newCode();
+        await createCode(user.id, await bcrypt.hash(code, BCRYPT_ROUNDS), CODE_MINUTES);
+
+        const { delivered } = await sendResetCode({
+            to: user.email, name: user.name, code, minutes: CODE_MINUTES,
+        });
+
+        purgeOld().catch(() => {});   // housekeeping; never blocks the response
+
+        return res.json({
+            message: VAGUE,
+            // Lets the UI say "check your email" or "email is not set up yet".
+            // Reveals neither the code nor whether the account exists.
+            emailConfigured: mailConfigured(),
+            delivered,
+        });
+    } catch (err) {
+        console.error("forgotPassword failed:", err);
+        return res.status(500).json({ message: "Could not start the password reset" });
+    }
+};
+
+// Shared by verify and reset so the two cannot drift apart on what counts as a
+// valid code.
+const checkCode = async (email, code) => {
+    const user = await findUserByEmail(email);
+    if (!user) return { ok: false, status: 400, message: "That code is not valid." };
+
+    const row = await latestFor(user.id);
+    if (!row || row.used_at) {
+        return { ok: false, status: 400, message: "That code is not valid. Request a new one." };
+    }
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+        return { ok: false, status: 400, message: "That code has expired. Request a new one." };
+    }
+    if (row.attempts >= MAX_ATTEMPTS) {
+        await markUsed(row.id);
+        return { ok: false, status: 429, message: "Too many incorrect attempts. Request a new code." };
+    }
+    if (!(await bcrypt.compare(String(code || ""), row.code_hash))) {
+        await countAttempt(row.id);
+        const left = MAX_ATTEMPTS - (row.attempts + 1);
+        return {
+            ok: false, status: 400,
+            message: left > 0
+                ? `That code is not correct. ${left} ${left === 1 ? "attempt" : "attempts"} left.`
+                : "That code is not correct. Request a new one.",
+        };
+    }
+    return { ok: true, user, row };
+};
+
+// Lets the UI move to the "new password" step without holding the code back
+// until the end - a wrong code should be caught before somebody types a new
+// password twice.
+const verifyResetCode = async (req, res) => {
+    try {
+        const result = await checkCode((req.body.email || "").trim().toLowerCase(), req.body.code);
+        if (!result.ok) return res.status(result.status).json({ message: result.message });
+        return res.json({ message: "Code accepted" });
+    } catch (err) {
+        console.error("verifyResetCode failed:", err);
+        return res.status(500).json({ message: "Could not check that code" });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const newPassword = req.body.newPassword || "";
+        if (newPassword.length < 8) {
+            return res.status(400).json({ message: "Password must be at least 8 characters" });
+        }
+
+        // Re-checked here rather than trusting the verify step. Without this,
+        // anyone could POST straight to reset and skip the code entirely.
+        const result = await checkCode((req.body.email || "").trim().toLowerCase(), req.body.code);
+        if (!result.ok) return res.status(result.status).json({ message: result.message });
+
+        await db.query("UPDATE users SET password = $2 WHERE id = $1", [
+            result.user.id,
+            await bcrypt.hash(newPassword, BCRYPT_ROUNDS),
+        ]);
+        await markUsed(result.row.id);
+
+        return res.json({ message: "Password updated. You can sign in with it now." });
+    } catch (err) {
+        console.error("resetPassword failed:", err);
+        return res.status(500).json({ message: "Could not update the password" });
+    }
+};
+
+module.exports = {
+    register, login, me, setupState,
+    forgotPassword, verifyResetCode, resetPassword,
+};

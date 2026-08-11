@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation, Link, useSearchParams } from "react-router-dom";
 import {
-  FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle,
+  FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle,
   FiZap, FiPieChart, FiCheckSquare, FiLayers,
 } from "react-icons/fi";
 import AuthShell from "../components/AuthShell";
@@ -72,6 +72,12 @@ const LoginPage = () => {
           Your session expired. Please sign in again.
         </div>
       )}
+      {location.state?.reset && !error && (
+        <div className="auth-alert auth-alert--ok">
+          <FiCheckCircle aria-hidden="true" />
+          Your password has been reset. Sign in with the new one.
+        </div>
+      )}
       {error && (
         <div className="auth-alert auth-alert--error" role="alert">
           <FiAlertCircle aria-hidden="true" />
@@ -131,6 +137,12 @@ const LoginPage = () => {
             />
             Remember me
           </label>
+          {/* Beside "Remember me" rather than below the button: somebody who
+              cannot remember their password needs this before they try to sign
+              in, not after they have already failed. */}
+          <Link to="/forgot-password" className="auth-forgot">
+            Forgot password?
+          </Link>
         </div>
 
         <button type="submit" className="auth-submit" disabled={submitting}>
