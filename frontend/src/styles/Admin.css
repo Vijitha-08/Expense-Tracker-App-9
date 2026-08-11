@@ -56,6 +56,15 @@
 .adm *::after { box-sizing: border-box; }
 
 /* ---------------- sidebar ---------------- */
+/* The sidebar stays put while the main column scrolls. It used to be an
+   ordinary flex child, so scrolling a long page - Reports especially - carried
+   the navigation off the top of the screen and you had to scroll all the way
+   back up to change page.
+
+   `position: sticky` rather than `fixed`: sticky keeps the element in the flex
+   row, so it still reserves its 250px and the main column needs no matching
+   margin. `height: 100vh` pins it to the viewport, and the inner overflow means
+   a short screen scrolls the nav itself instead of clipping Log out. */
 .adm-side {
     width: 250px;
     flex: none;
@@ -64,6 +73,12 @@
     padding: 24px 18px;
     display: flex;
     flex-direction: column;
+
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .adm-brand { display: flex; align-items: center; gap: 11px; padding: 0 6px 22px; }
@@ -650,7 +665,12 @@
 
 @media (max-width: 860px) {
     .adm { flex-direction: column; }
-    .adm-side { width: 100%; flex-direction: column; }
+    /* Stacked layout: the nav sits above the content as a normal block. Pinning
+       it here would eat most of a phone screen before any content showed. */
+    .adm-side {
+        width: 100%; flex-direction: column;
+        position: static; height: auto; overflow-y: visible;
+    }
     .adm-nav { flex-direction: row; flex-wrap: wrap; }
     .adm-side-foot { margin-top: 16px; }
     .adm-main { padding: 22px 18px 34px; }
