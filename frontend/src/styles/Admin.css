@@ -302,7 +302,9 @@
 .adm-dim { color: var(--a-muted); }
 .adm-zero { color: var(--a-muted-soft); }
 
-.adm-who { display: flex; align-items: center; gap: 10px; }
+.adm-who { display: flex; align-items: center; gap: 11px; min-width: 0; }
+/* the avatar must not shrink, and the text beside it must be allowed to */
+.adm-who > .adm-stack { flex: 1; min-width: 0; }
 .adm-pip {
     width: 32px; height: 32px; border-radius: var(--a-pill);
     background: var(--a-page-alt); color: var(--a-ink-soft);
@@ -326,6 +328,37 @@
 .adm-role-user { background: var(--a-page-alt); color: var(--a-ink-soft); }
 .adm-role-admin { background: var(--a-accent-wash); color: var(--a-accent); }
 .adm-role-new { background: var(--a-warn-wash); color: var(--a-warn); }
+
+/* ---- Layout B: declared column widths, figures in one block ----
+   With the default `table-layout: auto` the browser sizes columns from their
+   content, so a long list of names claimed width and pushed the figures to the
+   far edge - leaving a gap in the middle of every row wide enough to lose your
+   place in. Declaring the widths fixes where each column sits regardless of
+   what lands in it. */
+.adm-table-fixed { table-layout: fixed; }
+.adm-col-num   { width: 110px; }
+.adm-col-money { width: 148px; }
+.adm-col-share { width: 190px; }
+
+/* The name, with its supporting detail on a second line. This is where the
+   columns that used to sit in the middle of the row now live. */
+.adm-stack { min-width: 0; }
+.adm-stack b { display: block; font-weight: 750; line-height: 1.25; }
+.adm-stack small {
+    display: block; margin-top: 3px;
+    color: var(--a-muted); font-size: 11.5px; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* One hairline where the labels end and the figures begin, so the numbers read
+   as a block rather than as four unrelated columns. */
+.adm-numblock { border-left: 1px solid var(--a-border); }
+.adm-table thead th.adm-numblock { border-left: 1px solid var(--a-border-strong); }
+
+/* The total row is bold by design, but its supporting line is still supporting
+   text - without this it inherited font-weight 800 and shouted as loudly as the
+   figure it was explaining. */
+.adm-table tfoot .adm-stack small { font-weight: 650; color: var(--a-muted); }
 
 /* a bar and its percentage side by side, inside a table cell */
 .adm-share-col { width: 190px; }

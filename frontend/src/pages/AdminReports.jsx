@@ -234,16 +234,27 @@ const AdminReports = () => {
                 ) : byPerson.length === 0 ? (
                     <p className="adm-empty">No user accounts yet.</p>
                 ) : (
-                    <table className="adm-table">
+                    /* Layout B. "Largest one" and "Biggest category" were their own
+                       columns, which spread five figures across the full width and
+                       left a gap in the middle of every row wide enough to lose
+                       your place in. They now sit as a second line under the name,
+                       and the figures form one block on the right. Nothing is
+                       dropped - it is moved. */
+                    <table className="adm-table adm-table-fixed">
+                        <colgroup>
+                            <col />
+                            <col className="adm-col-num" />
+                            <col className="adm-col-money" />
+                            <col className="adm-col-money" />
+                            <col className="adm-col-share" />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Person</th>
-                                <th className="adm-right">Expenses</th>
+                                <th className="adm-right adm-numblock">Expenses</th>
                                 <th className="adm-right">Approx / month</th>
-                                <th className="adm-right">Largest one</th>
-                                <th>Biggest category</th>
                                 <th className="adm-right">Total spend</th>
-                                <th className="adm-share-col">Share of gross</th>
+                                <th>Share of gross</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -252,22 +263,21 @@ const AdminReports = () => {
                                     <td>
                                         <span className="adm-who">
                                             <span className="adm-pip">{initials(p.name)}</span>
-                                            <b>{p.name}</b>
+                                            <span className="adm-stack">
+                                                <b>{p.name}</b>
+                                                <small>
+                                                    {p.entries === 0
+                                                        ? "nothing recorded yet"
+                                                        : <>Mostly {p.topCategory} · largest {display.amount(p.largest)}</>}
+                                                </small>
+                                            </span>
                                         </span>
                                     </td>
-                                    <td className={`adm-right adm-mono${p.entries === 0 ? " adm-zero" : ""}`}>
+                                    <td className={`adm-right adm-mono adm-numblock${p.entries === 0 ? " adm-zero" : ""}`}>
                                         {p.entries}
                                     </td>
                                     <td className={`adm-right adm-mono${p.entries === 0 ? " adm-zero" : ""}`}>
                                         {p.entries === 0 ? "—" : display.amount(p.perMonth)}
-                                    </td>
-                                    <td className={`adm-right adm-mono${p.entries === 0 ? " adm-zero" : ""}`}>
-                                        {p.entries === 0 ? "—" : display.amount(p.largest)}
-                                    </td>
-                                    <td>
-                                        {p.topCategory
-                                            ? <span className="adm-tag">{p.topCategory}</span>
-                                            : <span className="adm-tag adm-tag-flat adm-zero">—</span>}
                                     </td>
                                     <td className={`adm-right adm-mono${p.entries === 0 ? " adm-zero" : ""}`}>
                                         {display.amount(p.total)}
@@ -285,18 +295,17 @@ const AdminReports = () => {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td>Total</td>
-                                <td className="adm-right adm-mono">{totalEntries}</td>
-                                <td className="adm-right adm-mono">—</td>
-                                <td className="adm-right adm-mono">{display.amount(biggestSingle)}</td>
-                                {/* wrapped so the total's category starts on the
-                                    same pixel as the pills above it, which carry
-                                    10px of their own padding */}
                                 <td>
-                                    <span className="adm-tag adm-tag-flat">
-                                        {topCategory ? topCategory.category : "—"}
+                                    <span className="adm-stack">
+                                        <b>Total</b>
+                                        <small>
+                                            Biggest category {topCategory ? topCategory.category : "—"}
+                                            {" · largest single "}{display.amount(biggestSingle)}
+                                        </small>
                                     </span>
                                 </td>
+                                <td className="adm-right adm-mono adm-numblock">{totalEntries}</td>
+                                <td className="adm-right adm-mono">—</td>
                                 <td className="adm-right adm-mono">{display.amount(gross)}</td>
                                 <td />
                             </tr>
@@ -314,14 +323,19 @@ const AdminReports = () => {
                 {byCategory.length === 0 ? (
                     <p className="adm-empty">Nothing recorded in {periodLabel(period).toLowerCase()}.</p>
                 ) : (
-                    <table className="adm-table">
+                    <table className="adm-table adm-table-fixed">
+                        <colgroup>
+                            <col />
+                            <col className="adm-col-num" />
+                            <col className="adm-col-money" />
+                            <col className="adm-col-share" />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Category</th>
-                                <th className="adm-right">Entries</th>
-                                <th>Who spends on it</th>
+                                <th className="adm-right adm-numblock">Entries</th>
                                 <th className="adm-right">Total</th>
-                                <th className="adm-share-col">Share of gross</th>
+                                <th>Share of gross</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -329,12 +343,18 @@ const AdminReports = () => {
                                 const who = [...c.who];
                                 return (
                                     <tr key={c.category}>
-                                        <td><b>{c.category}</b></td>
-                                        <td className="adm-right adm-mono">{c.count}</td>
-                                        <td className="adm-dim">
-                                            {who.slice(0, 2).join(", ")}
-                                            {who.length > 2 && ` +${who.length - 2} more`}
+                                        {/* who spends on it moves under the name, which
+                                            is what closes the gap in the middle of the row */}
+                                        <td>
+                                            <span className="adm-stack">
+                                                <b>{c.category}</b>
+                                                <small>
+                                                    {who.slice(0, 3).join(", ")}
+                                                    {who.length > 3 && ` +${who.length - 3} more`}
+                                                </small>
+                                            </span>
                                         </td>
+                                        <td className="adm-right adm-mono adm-numblock">{c.count}</td>
                                         <td className="adm-right adm-mono">{display.amount(c.total)}</td>
                                         <td>
                                             <span className="adm-share">
@@ -351,8 +371,7 @@ const AdminReports = () => {
                         <tfoot>
                             <tr>
                                 <td>Total — {byCategory.length} {byCategory.length === 1 ? "category" : "categories"}</td>
-                                <td className="adm-right adm-mono">{scoped.length}</td>
-                                <td />
+                                <td className="adm-right adm-mono adm-numblock">{scoped.length}</td>
                                 <td className="adm-right adm-mono">{display.amount(gross)}</td>
                                 <td />
                             </tr>
