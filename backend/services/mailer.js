@@ -64,6 +64,33 @@ const html = (name, code, minutes) => `
   </p>
 </div>`;
 
+// Can we actually reach the mail server?
+//
+// This is checked BEFORE the account lookup, and that ordering is the whole
+// point. If it were checked after, a broken mail server would answer "502" for
+// a real address and "200" for a made-up one - handing an attacker exactly the
+// account-enumeration oracle the vague reply exists to prevent. Checked first,
+// the answer depends only on the health of the server.
+//
+// Cached briefly so a burst of requests does not open a connection each time.
+const VERIFY_TTL_MS = 30000;
+let lastVerify = { at: 0, ok: false, error: null };
+
+const verifyTransport = async () => {
+    if (!CONFIGURED) return { ok: false, error: "not configured" };
+    if (Date.now() - lastVerify.at < VERIFY_TTL_MS) return lastVerify;
+    try {
+        await getTransport().verify();
+        lastVerify = { at: Date.now(), ok: true, error: null };
+    } catch (err) {
+        // Drop the cached transport: a bad password or a changed host needs a
+        // fresh connection once the settings are corrected.
+        transport = null;
+        lastVerify = { at: Date.now(), ok: false, error: err.message };
+    }
+    return lastVerify;
+};
+
 const sendResetCode = async ({ to, name, code, minutes }) => {
     if (!CONFIGURED) {
         if (process.env.NODE_ENV === "production") {
@@ -88,4 +115,4 @@ const sendResetCode = async ({ to, name, code, minutes }) => {
     return { delivered: true };
 };
 
-module.exports = { sendResetCode, mailConfigured: () => CONFIGURED };
+module.exports = { sendResetCode, verifyTransport, mailConfigured: () => CONFIGURED };

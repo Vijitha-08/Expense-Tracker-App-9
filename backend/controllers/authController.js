@@ -139,7 +139,7 @@ const setupState = async (req, res) => {
    ============================================================ */
 const crypto = require("crypto");
 const { createCode, latestFor, countAttempt, markUsed, purgeOld } = require("../models/resetModel");
-const { sendResetCode, mailConfigured } = require("../services/mailer");
+const { sendResetCode, verifyTransport, mailConfigured } = require("../services/mailer");
 const db = require("../config/db");
 
 const CODE_MINUTES = 10;
@@ -155,6 +155,25 @@ const forgotPassword = async (req, res) => {
     try {
         if (!EMAIL_RE.test(email)) {
             return res.status(400).json({ message: "Please enter a valid email address" });
+        }
+
+        // Checked BEFORE the account lookup, deliberately. A mail server that
+        // is configured but unreachable - a mistyped app password is the usual
+        // cause - used to throw further down and come back as a bare 500, which
+        // left the person staring at "something went wrong" while the real
+        // reason sat in the server log. Now it says what is wrong and who can
+        // fix it. Doing this first also keeps the reply independent of whether
+        // the address exists, so it cannot be used to test for accounts.
+        if (mailConfigured()) {
+            const mail = await verifyTransport();
+            if (!mail.ok) {
+                console.error("reset email cannot be sent - SMTP unreachable:", mail.error);
+                return res.status(502).json({
+                    message: "Codes cannot be emailed right now - the email settings on the server need checking. Please ask the administrator.",
+                    emailConfigured: true,
+                    delivered: false,
+                });
+            }
         }
 
         const user = await findUserByEmail(email);
