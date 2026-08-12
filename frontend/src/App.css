@@ -660,3 +660,164 @@ body {
 .footer-section ul li a:hover, .footer-links a:hover { color: #fff; }
 .footer-links a { color: #94a3b8; font-size: 13.5px; }
 .footer-bottom p { color: #94a3b8; font-size: 13.5px; }
+
+/* ============================================================
+   Mobile
+   ============================================================
+   The landing page had no media queries at all. It was not merely
+   "unoptimised" - it was broken: the five nav links came to 402px in a row,
+   which is wider than a 390px phone, and that single overflow pushed the page
+   canvas out to 782px. Every centred section below then centred inside 782
+   rather than 390, so on a phone the whole site sat in the left half of the
+   screen with a sideways scrollbar.
+
+   Fixing the nav is what makes the rest of the page fall into place. The rest
+   of this block is the ordinary work: fewer columns, smaller type, and touch
+   targets big enough to actually hit.
+   ============================================================ */
+
+/* NOT doing `html, body { overflow-x: hidden }` here, though it is the usual
+   reflex. It silently breaks `position: sticky` for every descendant - measured:
+   with it in place the navbar stopped sticking at BOTH 390px and 1440px, and it
+   would have killed the admin sidebar too. It also only hides overflow rather
+   than fixing it, so the next one goes unnoticed. The overflow is fixed at the
+   source instead, in the nav below.  */
+
+/* The menu button only exists below the breakpoint. */
+.nav-toggle { display: none; }
+.nav-scrim { display: none; }
+
+@media (max-width: 900px) {
+    .navbar {
+        padding: 14px 20px;
+        flex-wrap: wrap;
+        position: sticky;
+        z-index: 40;
+    }
+    .logo h2 { font-size: 18px; }
+
+    .nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* 44px is the smallest target most people can hit reliably. */
+        width: 44px; height: 44px;
+        margin-left: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+    }
+    .nav-toggle svg { width: 21px; height: 21px; }
+
+    /* The links become a panel under the bar. `display:none` rather than a
+       height transition: a hidden panel must not be reachable by tab. */
+    .nav-links {
+        display: none;
+        order: 3;
+        width: 100%;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+    }
+    .navbar--open .nav-links { display: flex; }
+    .nav-links li { width: 100%; }
+    .nav-links a {
+        display: block;
+        padding: 13px 12px;          /* the whole row is tappable, not just the word */
+        border-radius: var(--r-sm);
+        font-size: 15.5px;
+        color: var(--ink);
+    }
+    .nav-links a:active { background: var(--page-alt); }
+
+    .nav-actions {
+        display: none;
+        order: 4;
+        width: 100%;
+        gap: 10px;
+        padding-bottom: 6px;
+    }
+    .navbar--open .nav-actions { display: flex; }
+    .nav-actions .nav-btn { flex: 1; height: 46px; }
+
+    /* Dims the page behind the menu. Rendered as a SIBLING of the nav (see
+       Navbar.jsx): as a child it lived inside the navbar's own stacking
+       context and painted over the navbar's white background, greying out the
+       very menu it was meant to sit behind. 30 is below the navbar's 40. */
+    .nav-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        border: 0;
+        background: rgba(15, 23, 42, .38);
+    }
+
+    /* ---- sections ---- */
+    .hero { padding: 44px 20px 56px; }
+    .hero-content { flex-direction: column; gap: 32px; }
+    .hero-text h1 { font-size: clamp(30px, 8.5vw, 40px); }
+    /* The markup has a hard <br /> in the headline, which on a narrow column
+       breaks the line in the wrong place. */
+    .hero-text h1 br { display: none; }
+    .hero-text p { font-size: 15.5px; line-height: 1.65; }
+    /* 11px uppercase with letter-spacing is hard work on a phone; 12px is the
+       floor for a label like this. */
+    .hero-badge { font-size: 12px; padding: 8px 14px; margin-bottom: 20px; }
+    .feature-tag, .about-tag { font-size: 12px; }
+    .hero-buttons { gap: 10px; margin-bottom: 30px; }
+    .hero-buttons button, .hero-buttons .primary-btn { height: 48px; flex: 1 1 auto; min-width: 140px; }
+    .hero-image { width: 100%; }
+    .hero-image img { width: 100%; height: auto; }
+
+    .stats { gap: 10px; }
+    .stats .stat-card { flex: 1 1 calc(50% - 5px); min-width: 0; padding: 14px 16px; }
+    .stats .stat-card h3 { font-size: 21px; }
+
+    /* The section classes are `-section` suffixed in the markup - `.how-it-works`
+       and `.features` match nothing at all, which is easy to miss because the
+       page still looks right (About.css and Features.css carry their own media
+       queries; HowItWorks.css carries none). */
+    .how-it-works-section, .features-section, .about-section, .contact { padding: 52px 20px; }
+    /* 48px against the 27px every other section heading drops to - it wrapped to
+       two lines and read as the page title rather than a section title. */
+    .how-it-works-section h2 { font-size: 27px; margin-bottom: 26px; }
+    .steps { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .step { width: auto; }
+
+    .contact-form { width: 100%; max-width: 100%; }
+    .contact-form input, .contact-form textarea {
+        width: 100%;
+        font-size: 16px;   /* under 16px iOS zooms the page on focus */
+    }
+    .contact-form button { width: 100%; height: 48px; }
+
+    .footer { padding: 44px 20px 20px; }
+    .footer-container { flex-direction: column; gap: 28px; }
+    .footer-bottom { flex-direction: column; gap: 10px; text-align: center; }
+    .footer-links { justify-content: center; flex-wrap: wrap; gap: 4px; }
+
+    /* Every footer link was a 16px-tall line of text - fine under a mouse
+       pointer, poor under a thumb. The padding goes on the anchor so the tap
+       area grows, and comes off the list item so the spacing on screen stays
+       where it was. Nothing looks different; the boxes are just bigger. */
+    .footer-section ul li { margin: 0; }
+    .footer-section ul li a { display: inline-block; padding: 14px 0; }
+    .footer-links a { display: inline-block; padding: 14px 8px; }
+
+    .social-icons a { width: 44px; height: 44px; }
+}
+
+@media (max-width: 420px) {
+    .navbar { padding: 12px 16px; }
+    .hero { padding: 36px 16px 46px; }
+    .how-it-works-section, .features-section, .about-section, .contact { padding: 44px 16px; }
+    .footer { padding: 38px 16px 18px; }
+    /* One stat per row rather than two cramped ones. */
+    .stats .stat-card { flex: 1 1 100%; }
+    .hero-buttons button, .hero-buttons .primary-btn { flex: 1 1 100%; }
+}
