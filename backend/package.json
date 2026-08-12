@@ -9,7 +9,8 @@
         "test": "node --test",
         "db:init": "node database/init.js",
         "db:check": "node database/check.js",
-        "db:reset": "node database/init.js --reset"
+        "db:reset": "node database/init.js --reset",
+        "test:email": "node test-email.js"
     },
     "keywords": [],
     "author": "",
