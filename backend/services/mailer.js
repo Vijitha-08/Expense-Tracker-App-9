@@ -26,6 +26,13 @@ const getTransport = () => {
             // 465 is implicit TLS; 587 upgrades with STARTTLS.
             secure: Number(process.env.SMTP_PORT) === 465,
             auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+            // Nodemailer waits indefinitely by default. On a network that
+            // silently drops port 587 that would hang the forgot-password
+            // request rather than failing it, leaving the page spinning with
+            // no error at all. Fail fast and let the 502 explain itself.
+            connectionTimeout: 10000,
+            greetingTimeout: 8000,
+            socketTimeout: 15000,
         });
     }
     return transport;
