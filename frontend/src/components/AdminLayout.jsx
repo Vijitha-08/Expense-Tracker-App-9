@@ -1,10 +1,16 @@
+import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
     FiTrendingUp, FiLogOut, FiGrid, FiUsers, FiBarChart2,
-    FiFileText, FiList, FiSettings,
+    FiFileText, FiList, FiSettings, FiMenu, FiX,
 } from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
 import "../styles/Admin.css";
+
+// Below 860px the sidebar collapses to a bar with a menu button - measured, it
+// was rendering its full 467px above the content on every admin page, which is
+// 57% of an 812px phone screen spent on navigation before any number appears.
+const NAV_BREAKPOINT = 860;
 
 // Sidebar chrome for every admin page. The user dashboard keeps the old
 // DashboardLayout top bar - the two roles are meant to read as different
@@ -37,6 +43,30 @@ const initials = (name) =>
 const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const [navOpen, setNavOpen] = useState(false);
+
+    // Closed from the link's own onClick rather than an effect on the pathname:
+    // setState inside an effect causes a second render pass, and the click is
+    // the moment we actually know the panel should go.
+    const closeNav = () => setNavOpen(false);
+
+    // A phone rotated to landscape can cross the breakpoint while the panel is
+    // open, stranding it over the desktop layout.
+    useEffect(() => {
+        const onResize = () => {
+            if (window.innerWidth > NAV_BREAKPOINT) setNavOpen(false);
+        };
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    // Stop the page scrolling behind the open panel.
+    useEffect(() => {
+        if (!navOpen) return;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = previous; };
+    }, [navOpen]);
 
     const handleLogout = () => {
         logout();
@@ -45,15 +75,33 @@ const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
 
     return (
         <div className="adm">
-            <aside className="adm-side">
-                <div className="adm-brand">
-                    <span className="adm-brand-mark" aria-hidden="true"><FiTrendingUp /></span>
-                    <span className="adm-brand-text">
-                        <b>Expense Tracker</b>
-                        <small>Admin panel</small>
-                    </span>
+            <aside className={`adm-side${navOpen ? " adm-side--open" : ""}`}>
+                {/* `.adm-side-top` and `.adm-side-panel` are `display: contents`
+                    above 860px, so on desktop the brand, nav sections and footer
+                    remain direct flex children of `.adm-side` exactly as before
+                    and `margin-top: auto` still pins Log out to the bottom. */}
+                <div className="adm-side-top">
+                    <div className="adm-brand">
+                        <span className="adm-brand-mark" aria-hidden="true"><FiTrendingUp /></span>
+                        <span className="adm-brand-text">
+                            <b>Expense Tracker</b>
+                            <small>Admin panel</small>
+                        </span>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="adm-nav-toggle"
+                        aria-label={navOpen ? "Close menu" : "Open menu"}
+                        aria-expanded={navOpen}
+                        aria-controls="adm-side-panel"
+                        onClick={() => setNavOpen((v) => !v)}
+                    >
+                        {navOpen ? <FiX aria-hidden="true" /> : <FiMenu aria-hidden="true" />}
+                    </button>
                 </div>
 
+                <div className="adm-side-panel" id="adm-side-panel">
                 {NAV.map((section) => (
                     <div key={section.group}>
                         <p className="adm-nav-label">{section.group}</p>
@@ -65,6 +113,7 @@ const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
                                     className={({ isActive }) =>
                                         `adm-nav-link${isActive ? " adm-nav-on" : ""}`
                                     }
+                                    onClick={closeNav}
                                 >
                                     <Icon aria-hidden="true" />
                                     {label}
@@ -89,7 +138,21 @@ const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
                         <FiLogOut aria-hidden="true" /> Log out
                     </button>
                 </div>
+                </div>
             </aside>
+
+            {/* Rendered as a sibling of the aside on purpose: inside it, the
+                scrim would join the sidebar's own stacking context and paint
+                over the navy bar it is supposed to sit behind. Tapping it
+                closes the panel, so the menu can never trap you. */}
+            {navOpen && (
+                <button
+                    type="button"
+                    className="adm-scrim"
+                    aria-label="Close menu"
+                    onClick={closeNav}
+                />
+            )}
 
             <main className="adm-main">
                 <div className="adm-head">

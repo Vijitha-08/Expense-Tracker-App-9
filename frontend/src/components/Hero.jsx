@@ -1,8 +1,12 @@
 import { Link } from "react-router-dom";
 import { FiTrendingUp } from "react-icons/fi";
 import heroImage from "../assets/hero.png";
+import useCardRail from "./useCardRail";
 
 function Hero() {
+  // Horizontal rail + auto-advance below 768px only; a no-op above it.
+  const statsRef = useCardRail();
+
   return (
     <section className="hero">
       <div className="hero-content">
@@ -36,7 +40,7 @@ function Hero() {
   </button>
 </div>
 
-          <div className="stats">
+          <div className="stats" ref={statsRef}>
             <div className="stat-card">
               <h3>10K+</h3>
               <p>Active Users</p>

@@ -833,3 +833,28 @@
     .dash .donut-wrap { justify-content: center; }
         .dash .dash-user-meta strong { display: none; }
 }
+
+/* ============================================================
+   MOBILE: KPI TILES TWO ACROSS
+   ------------------------------------------------------------
+   `.stat-grid` is `repeat(auto-fit, minmax(210px, 1fr))`. On a
+   375px screen the content box is 343px, so 210px only ever fits
+   once and the four tiles became a 511px single column.
+
+   Two across rather than a horizontal rail: these four figures
+   exist to be compared, and a rail hides three of them behind a
+   swipe. `.stat-value` is already `clamp(21px, 2.4vw, 27px)` with
+   `word-break: break-word`, so no type sizes change here - the
+   value simply renders at its 21px floor, as it already did.
+
+   `minmax(0, 1fr)`, not `1fr`: a 1fr track's automatic minimum is
+   its content's min-content width, so one long figure would push
+   its column past half the row.
+   ============================================================ */
+@media (max-width: 720px) {
+    .dash .stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+    .dash .stat-card { padding: 16px 14px 14px; }
+}

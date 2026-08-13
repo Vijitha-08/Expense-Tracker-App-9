@@ -1,10 +1,15 @@
 import "../styles/HowItWorks.css";
+import useCardRail from "./useCardRail";
+
 const HowItWorks = () => {
+  // Horizontal rail + auto-advance below 768px only; a no-op above it.
+  const stepsRef = useCardRail();
+
   return (
     <section id ="howItWorks" className="how-it-works-section">
       <h2>How It Works</h2>
 
-      <div className="steps">
+      <div className="steps" ref={stepsRef}>
         <div className="step">
           <h3>1. Add Income & Expenses</h3>
           <p>Record your daily income and expenses easily.</p>

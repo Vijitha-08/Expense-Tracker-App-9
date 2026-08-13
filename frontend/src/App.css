@@ -821,3 +821,126 @@ body {
     .stats .stat-card { flex: 1 1 100%; }
     .hero-buttons button, .hero-buttons .primary-btn { flex: 1 1 100%; }
 }
+
+/* ============================================================
+   MOBILE CARD RAILS
+   ------------------------------------------------------------
+   On phones the hero stats and the three "How It Works" cards
+   stacked one under the other, which pushed everything below
+   them a long way down the page. Below 768px they become a
+   single horizontal, snap-scrolling row instead.
+
+   Deliberately additive: nothing above this block is edited, and
+   every rule is inside the media query, so the desktop and tablet
+   layouts are untouched. Card colours, padding, radius, shadow
+   and type all stay exactly as they were - only the container's
+   layout and the card's flex sizing change.
+
+   Note the two rules this block has to override, both of which
+   live in the (max-width: 900px) / (max-width: 420px) blocks
+   above: `.stats .stat-card { flex: 1 1 ... }` and
+   `.steps { display: grid }`. This block comes later in the file
+   at the same specificity, so it wins on order.
+   ============================================================ */
+@media (max-width: 768px) {
+
+    /* The shared rail behaviour. `overflow-y: hidden` rather than
+       `visible`: a scroll container cannot have one axis scroll and
+       the other visible - the browser silently promotes `visible` to
+       `auto` and you get a stray vertical scrollbar inside the rail. */
+    .hero .stats,
+    .how-it-works-section .steps {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        /* Keeps a swipe that runs off the end of the rail from turning
+           into a browser back-gesture or a page-level sideways scroll. */
+        overscroll-behavior-x: contain;
+        /* Belt and braces against the one thing that would break the
+           page: the rail itself must never be wider than its parent. */
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        /* No visible scrollbar - the auto-advance on load is the
+           affordance that tells you the row moves. */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .hero .stats::-webkit-scrollbar,
+    .how-it-works-section .steps::-webkit-scrollbar { display: none; }
+
+    /* `.hero-text` is a flex item; without this it refuses to shrink
+       below its content width and the rail can push the page wide. */
+    .hero .hero-text,
+    .hero .hero-content { min-width: 0; max-width: 100%; }
+
+    /* ---- hero stats ---- */
+    .hero .stats {
+        gap: 12px;
+        margin-top: 20px;
+        /* Bottom room so the card shadow is not clipped by the
+           scroll container; top room for the same reason. */
+        padding: 4px 0 12px;
+    }
+
+    /* Two cards visible with the third peeking, so it is obvious the
+       row continues. `flex: 0 0 auto` cancels the `flex: 1 1 50%` /
+       `flex: 1 1 100%` from the blocks above, which would otherwise
+       squeeze all three into the visible width and defeat the rail. */
+    .hero .stats .stat-card {
+        flex: 0 0 auto;
+        width: 46%;
+        min-width: 138px;
+        max-width: 200px;
+        padding: 14px 16px;
+        scroll-snap-align: start;
+    }
+
+    .hero .stats .stat-card h3 { font-size: 21px; }
+
+    /* ---- how it works ---- */
+    .how-it-works-section .steps {
+        gap: 14px;
+        padding: 6px 0 16px;
+        justify-content: flex-start;
+    }
+
+    /* These cards carry real prose, so one at a time with a slice of
+       the next one showing. `width: 300px` from HowItWorks.css and
+       `width: auto` from the 900px block are both replaced here. */
+    .how-it-works-section .steps .step {
+        flex: 0 0 auto;
+        width: 86%;
+        min-width: 0;
+        max-width: 320px;
+        scroll-snap-align: start;
+    }
+
+    /* The lift-on-hover exists for a mouse. Inside a scroll container
+       a sticky :hover state on a touch device leaves a card floating
+       out of line with its neighbours after a tap. */
+    .hero .stats .stat-card:hover,
+    .how-it-works-section .steps .step:hover { transform: none; }
+}
+
+/* At the narrow end of the range the stat cards would drop under
+   138px, so show one and a half instead of two and a half. */
+@media (max-width: 380px) {
+    .hero .stats .stat-card { width: 60%; min-width: 150px; }
+    .how-it-works-section .steps .step { width: 88%; }
+}
+
+/* Someone who has asked the OS to reduce motion should not get a
+   row that slides on its own, and should not get smooth-scroll
+   easing on their own swipes either. The rail still scrolls. */
+@media (prefers-reduced-motion: reduce) {
+    .hero .stats,
+    .how-it-works-section .steps { scroll-behavior: auto; }
+}

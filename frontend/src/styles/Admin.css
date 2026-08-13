@@ -718,3 +718,139 @@
     .adm-table { font-size: 12.5px; }
     .adm-table th, .adm-table td { padding: 10px 8px; }
 }
+
+/* ============================================================
+   MOBILE: 2-UP KPI BANDS + A COLLAPSIBLE SIDEBAR
+   ------------------------------------------------------------
+   Two separate mobile problems, both measured at 375x812 with
+   real data (7 accounts, 84 expenses):
+
+   1. The KPI bands went to a single column at 860px, so four
+      84px-tall count cards became a 384px column of mostly
+      whitespace. Two across recovers ~200px per band and,
+      unlike a horizontal rail, hides nothing - which matters,
+      because the whole point of a KPI band is comparing the
+      figures at a glance.
+
+   2. `.adm-side` was `position: static` below 860px, so the full
+      467px sidebar rendered above the content on every admin
+      page. On an 812px screen that is 57% of the first view
+      spent on navigation before a single number appears.
+
+   Everything here is inside `@media (max-width: 860px)`, which is
+   the breakpoint the file already uses, so desktop is untouched.
+   ============================================================ */
+@media (max-width: 860px) {
+
+    /* ---- 1. KPI bands, two across ----
+       `minmax(0, 1fr)` rather than plain `1fr`: a 1fr track has an
+       automatic minimum of its content's min-content width, so one
+       long unbreakable figure (~₹3.69 L) would push its own column
+       wider than half and shove the other card off-screen. */
+    .adm-grid-3,
+    .adm-grid-4,
+    .adm-cmp,
+    .adm-upanel,
+    .adm-dstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    /* Left deliberately at one column by the block above:
+         .adm-row2   - label + input form pairs, not cards
+         .adm-grid-2 - two full panels (on Settings, two forms)
+         .adm-grid-32 / .adm-split - chart + list, very unequal heights
+       Side-by-side would either clip a form or shrink a chart to
+       nothing. */
+
+    /* The icon + figure row inside a count card is 44px of icon plus
+       a 15px gap; at half width that leaves the number ~86px. Let it
+       wrap to two lines rather than overflow the card. */
+    .adm-ig { gap: 12px; padding: 16px 14px; }
+    .adm-ig-n { overflow-wrap: anywhere; }
+
+    /* ---- 2. Sidebar behind a toggle ----
+       The two wrappers added in AdminLayout.jsx are `display: contents`
+       at every other width (see the desktop rules further down this
+       file), so on a large screen the brand, nav and footer stay direct
+       flex children of `.adm-side` and nothing about the desktop
+       sidebar changes. Here they become real boxes. */
+    .adm-side {
+        padding: 10px 14px;
+        position: sticky;          /* was `static` - the bar now stays reachable */
+        top: 0;
+        z-index: 40;
+        height: auto;
+        overflow: visible;
+    }
+
+    .adm-side-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    /* The brand loses its 22px bottom padding - it is a bar now, not a
+       heading above a list. */
+    .adm-side-top .adm-brand { padding: 0; }
+
+    .adm-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* 44px: the smallest target most thumbs hit reliably. */
+        width: 44px; height: 44px;
+        flex: none;
+        border-radius: 11px;
+        border: 1px solid rgba(255, 255, 255, .14);
+        background: rgba(255, 255, 255, .07);
+        color: #fff;
+        cursor: pointer;
+    }
+    .adm-nav-toggle svg { width: 21px; height: 21px; }
+    .adm-nav-toggle:active { background: rgba(255, 255, 255, .14); }
+
+    /* `display: none` rather than height/opacity: a closed panel must
+       not be reachable by Tab, and a 0-height panel still is. */
+    .adm-side-panel {
+        display: none;
+        flex-direction: column;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, .10);
+    }
+    .adm-side--open .adm-side-panel { display: flex; }
+
+    /* `margin-top: auto` only makes sense in a full-height column. */
+    .adm-side-panel .adm-side-foot { margin-top: 12px; }
+
+    /* Two columns of links instead of one long list - the whole open
+       panel then fits a phone screen without scrolling. */
+    .adm-side-panel .adm-nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+    .adm-side-panel .adm-nav-link { padding: 12px; }
+
+    /* Sibling of the aside, not a child: as a child it would sit inside
+       the sidebar's own stacking context and paint over the navy bar it
+       is meant to sit behind. 30 is below the bar's 40. */
+    .adm-scrim {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        border: 0;
+        padding: 0;
+        background: rgba(8, 12, 26, .5);
+    }
+}
+
+/* Above the breakpoint the two wrappers must not exist as boxes, or the
+   sidebar becomes a two-item column and `margin-top: auto` on the footer
+   stops pushing Log out to the bottom. `display: contents` removes the
+   box and promotes the children to flex items of `.adm-side` again. */
+@media (min-width: 861px) {
+    .adm-side-top,
+    .adm-side-panel { display: contents; }
+    .adm-nav-toggle { display: none; }
+    .adm-scrim { display: none; }
+}
