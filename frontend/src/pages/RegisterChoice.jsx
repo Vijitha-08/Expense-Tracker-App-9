@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   FiUser, FiShield, FiUserPlus, FiLayers, FiCheckSquare, FiLock,
 } from "react-icons/fi";
-import AuthShell from "../components/AuthShell";
+import AuthShell from "../Layouts/AuthShell";
 import AuthIntro from "../components/AuthIntro";
 import { fetchSetupState } from "../services/authService";
 

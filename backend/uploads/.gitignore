@@ -1,0 +1,4 @@
+# Uploaded files are runtime data, not source. Keep the folder, ignore its contents.
+*
+!.gitkeep
+!.gitignore

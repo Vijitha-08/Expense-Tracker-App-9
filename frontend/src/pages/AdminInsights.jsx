@@ -4,7 +4,7 @@ import {
     FiRefreshCw, FiAlertCircle, FiInfo, FiAlertTriangle, FiClock,
     FiTrendingUp, FiCheck, FiCalendar,
 } from "react-icons/fi";
-import AdminLayout from "../components/AdminLayout";
+import AdminLayout from "../Layouts/AdminLayout";
 import { useDisplay } from "../context/useDisplay";
 import { shareLabel } from "../services/format";
 import {

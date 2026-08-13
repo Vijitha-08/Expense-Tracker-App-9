@@ -5,7 +5,7 @@ const {
     register, login, me, setupState,
     forgotPassword, verifyResetCode, resetPassword,
 } = require("../controllers/authController");
-const auth = require("../middleware/authMiddleware");
+const auth = require("../middlewares/authMiddleware");
 
 router.post("/register", register);
 router.post("/login", login);

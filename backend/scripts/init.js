@@ -3,7 +3,7 @@
  *
  *   npm run db:init
  *
- * Creates the database if it does not exist, then applies database/schema.sql.
+ * Creates the database if it does not exist, then applies scripts/schema.sql.
  * Uses the `pg` driver rather than shelling out to psql, so it works the same
  * on Windows (PowerShell or cmd), macOS and Linux, and does not require the
  * Postgres command line tools to be on PATH.
@@ -88,7 +88,7 @@ const fail = (msg, err) => {
         );
         console.log("\n  Database ready. Start the API with:  npm run dev\n");
     } catch (err) {
-        fail("Failed to apply database/schema.sql.", err);
+        fail("Failed to apply scripts/schema.sql.", err);
     } finally {
         await db.end();
     }

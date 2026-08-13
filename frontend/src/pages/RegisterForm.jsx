@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   FiUser, FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle, FiInfo,
 } from "react-icons/fi";
-import AuthShell from "../components/AuthShell";
+import AuthShell from "../Layouts/AuthShell";
 import AuthIntro from "../components/AuthIntro";
 import { useAuth } from "../context/useAuth";
 import { dashboardPath } from "../services/authService";

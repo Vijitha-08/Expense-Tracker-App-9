@@ -4,7 +4,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const loadWithDatabase = (modelFile, query) => {
-    const dbPath = require.resolve("../config/db");
+    const dbPath = require.resolve("../src/config/db");
     const modelPath = require.resolve(modelFile);
     const previousDb = require.cache[dbPath];
 
@@ -25,7 +25,7 @@ const loadWithDatabase = (modelFile, query) => {
 
 test("database initialization never drops persisted tables", () => {
     const schema = fs.readFileSync(
-        path.join(__dirname, "..", "database", "schema.sql"),
+        path.join(__dirname, "..", "scripts", "schema.sql"),
         "utf8"
     );
 
@@ -45,7 +45,7 @@ test("repeat setup reads the existing PostgreSQL target", () => {
 test("user registration inserts the profile into PostgreSQL", async () => {
     const calls = [];
     const user = { id: 7, name: "Asha", email: "asha@example.com", role: "user" };
-    const model = loadWithDatabase("../models/userModel", async (sql, params) => {
+    const model = loadWithDatabase("../src/models/userModel", async (sql, params) => {
         calls.push({ sql, params });
         return { rows: [user] };
     });
@@ -60,7 +60,7 @@ test("user registration inserts the profile into PostgreSQL", async () => {
 test("creating an expense inserts it with the signed-in user's id", async () => {
     const calls = [];
     const expense = { id: 11, user_id: 7, title: "Lunch", amount: "250.00" };
-    const model = loadWithDatabase("../models/expenseModel", async (sql, params) => {
+    const model = loadWithDatabase("../src/models/expenseModel", async (sql, params) => {
         calls.push({ sql, params });
         return { rows: [expense] };
     });

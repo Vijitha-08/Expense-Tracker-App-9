@@ -2,15 +2,15 @@
     "name": "expense-tracker-backend",
     "version": "1.0.0",
     "description": "Expense Tracker API - Express + PostgreSQL with user and admin roles",
-    "main": "server.js",
+    "main": "src/server.js",
     "scripts": {
-        "start": "node server.js",
-        "dev": "nodemon server.js",
+        "start": "node src/server.js",
+        "dev": "nodemon src/server.js",
         "test": "node --test",
-        "db:init": "node database/init.js",
-        "db:check": "node database/check.js",
-        "db:reset": "node database/init.js --reset",
-        "test:email": "node test-email.js"
+        "db:init": "node scripts/init.js",
+        "db:check": "node scripts/check.js",
+        "db:reset": "node scripts/init.js --reset",
+        "test:email": "node scripts/test-email.js"
     },
     "keywords": [],
     "author": "",

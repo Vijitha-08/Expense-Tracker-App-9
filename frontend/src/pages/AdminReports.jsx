@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiDownload, FiPrinter, FiAlertCircle } from "react-icons/fi";
-import AdminLayout from "../components/AdminLayout";
+import AdminLayout from "../Layouts/AdminLayout";
 import PeriodPicker from "../components/PeriodPicker";
 import { inPeriod, periodLabel } from "../services/period";
 import { MonthBars, CategoryDonut } from "../components/AdminCharts";

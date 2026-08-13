@@ -5,8 +5,8 @@ const {
     getOverview, getAllExpenses, getTeam, createTeamMember,
     getPeople, getPerson, exportExpenses,
 } = require("../controllers/adminController");
-const auth = require("../middleware/authMiddleware");
-const { requireRole } = require("../middleware/roleMiddleware");
+const auth = require("../middlewares/authMiddleware");
+const { requireRole } = require("../middlewares/roleMiddleware");
 
 // Applied once at the router level, so a new route added below cannot
 // accidentally ship without the role check.

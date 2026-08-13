@@ -5,8 +5,8 @@ const {
     addExpense, getExpenses,
     getExpense, updateExpense, deleteExpense, getSummary,
 } = require("../controllers/expenseController");
-const auth = require("../middleware/authMiddleware");
-const { requireRole } = require("../middleware/roleMiddleware");
+const auth = require("../middlewares/authMiddleware");
+const { requireRole } = require("../middlewares/roleMiddleware");
 
 // Every route here is the owner's own expenses. Admins are deliberately
 // excluded: they oversee other people's spending rather than filing their own,
