@@ -108,7 +108,7 @@ frontend/src/  assets  components  context  pages  services  styles
 ```
 
 Nothing lives outside those. Shared helpers sit inside the existing folders
-(`context/useAuth.js`, `services/format.js`, `database/init.js`) rather than in
+(`context/useAuth.js`, `services/format.js`, `scripts/init.js`) rather than in
 new `hooks/` or `utils/` directories.
 
 ## Quickest possible start
@@ -228,8 +228,8 @@ backend/
     expenseController.js  the submitter's own expenses
     adminController.js    overview, all expenses, team
   routes/                 thin route wiring
-  database/init.js        safe database setup (`db:init`) and explicit reset
-  database/check.js       read-only connection target and persisted row counts
+  scripts/init.js         safe database setup (`db:init`) and explicit reset
+  scripts/check.js        read-only connection target and persisted row counts
   server.js               env checks, CORS, JSON errors, 404 handler
 
 frontend/src/

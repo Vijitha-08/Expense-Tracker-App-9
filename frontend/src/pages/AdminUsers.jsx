@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
     FiSearch, FiPlus, FiAlertCircle, FiCheckCircle, FiLock, FiFileText,
 } from "react-icons/fi";
-import AdminLayout from "../components/AdminLayout";
+import AdminLayout from "../Layouts/AdminLayout";
 import UserPanel from "../components/UserPanel";
 import { useDisplay } from "../context/useDisplay";
 import * as admin from "../services/adminService";

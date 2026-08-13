@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     FiPlus, FiCreditCard, FiCalendar, FiAlertCircle, FiBarChart2, FiTrendingUp,
 } from "react-icons/fi";
-import DashboardLayout from "../components/DashboardLayout";
+import DashboardLayout from "../Layouts/DashboardLayout";
 import StatCards from "../components/StatCards";
 import MonthlyTrend from "../components/MonthlyTrend";
 import CategoryDonut from "../components/CategoryDonut";

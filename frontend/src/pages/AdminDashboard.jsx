@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FiRefreshCw, FiAlertCircle, FiInfo } from "react-icons/fi";
-import AdminLayout from "../components/AdminLayout";
+import AdminLayout from "../Layouts/AdminLayout";
 import UserPanel from "../components/UserPanel";
 import PeriodPicker from "../components/PeriodPicker";
 import { inPeriod, periodLabel } from "../services/period";

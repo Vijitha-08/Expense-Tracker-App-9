@@ -4,7 +4,7 @@ import {
     FiMail, FiLock, FiAlertCircle, FiCheckCircle, FiArrowLeft,
     FiEye, FiEyeOff, FiShield, FiClock,
 } from "react-icons/fi";
-import AuthShell from "../components/AuthShell";
+import AuthShell from "../Layouts/AuthShell";
 import AuthIntro from "../components/AuthIntro";
 import { requestResetCode, verifyResetCode, resetPassword } from "../services/authService";
 

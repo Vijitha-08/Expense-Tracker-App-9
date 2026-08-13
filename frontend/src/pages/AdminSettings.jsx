@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
     FiDownload, FiPlus, FiAlertCircle, FiCheckCircle, FiInfo,
 } from "react-icons/fi";
-import AdminLayout from "../components/AdminLayout";
+import AdminLayout from "../Layouts/AdminLayout";
 import { useAuth } from "../context/useAuth";
 import { useDisplay } from "../context/useDisplay";
 import { PERIODS } from "../services/period";
