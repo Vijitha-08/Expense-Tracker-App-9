@@ -594,11 +594,21 @@
     }
 }
 
-/* ---------- PART B: /login only - form first ---------- */
-/* `order` on grid items, so the DOM order is unchanged: the intro still
-   precedes the card in the markup, which is what a screen reader and a
-   no-CSS render follow. Only the visual order flips. */
+/* ---------- PART B: form first, on every auth page ---------- */
+/* Originally scoped to `.auth--login` while the pattern had only been
+   reviewed for sign-in. Now applied to all of them, because the measured
+   problem is identical on each: first field at y=1152 on /register/user,
+   y=1199 on /register/admin and y=1115 on /forgot-password, against an
+   812px screen. Every one opened on marketing copy with the form out of
+   sight, exactly as /login did.
+
+   `order` on the grid items, so the DOM order is unchanged: the intro
+   still precedes the card in the markup, which is what a screen reader
+   and a no-CSS render follow. Only the visual order flips.
+
+   The account-type chooser renders `.auth-body--single` with no
+   `.auth-left` at all, so these rules are inert there. */
 @media (max-width: 1080px) {
-    .auth--login .auth-card { order: 1; }
-    .auth--login .auth-left { order: 2; }
+    .auth .auth-card { order: 1; }
+    .auth .auth-left { order: 2; }
 }

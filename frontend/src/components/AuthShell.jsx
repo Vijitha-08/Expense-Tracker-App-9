@@ -5,11 +5,10 @@ import "../styles/Login.css";
 // Shared chrome for /login, /register and the role pages: brand bar,
 // "Back to Home", and the two-column body. `left` is optional so the
 // account-type chooser can render a single centred card.
-// `variant` adds an `auth--<variant>` class so a single page can opt into
-// layout that the others should not get. /login passes "login" to put the
-// form above the intro copy on mobile (see PART B in Login.css); the
-// register and forgot-password pages deliberately do not, since that
-// reorder was only reviewed for sign-in.
+// `variant` adds an `auth--<variant>` class, kept as a hook for any page
+// that later needs layout the others should not get. The form-first
+// reorder no longer uses it - it applies to every auth page now (PART B
+// in Login.css), since all four measured the same: form below the fold.
 const AuthShell = ({ left, variant, children }) => (
     <div className={`auth${variant ? ` auth--${variant}` : ""}`}>
         <header className="auth-topbar">

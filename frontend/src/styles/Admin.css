@@ -854,3 +854,48 @@
     .adm-nav-toggle { display: none; }
     .adm-scrim { display: none; }
 }
+
+/* ============================================================
+   ADMIN - MOBILE CONTROL SIZING
+   ------------------------------------------------------------
+   Same two defects as the user dashboard, measured across all six
+   admin pages at 375x812 with real data (7 accounts, 84 expenses):
+
+     selects and search inputs   13.5px  -> iOS zooms on focus
+     period / category / person pickers   22px tall
+     settings tabs                        33px
+     Refresh, Export CSV, Print, Save     38px
+     "Add a person", "Open their report"  38px
+
+   A 22px picker is the worst of them: it is the control you reach
+   for first on every one of these pages.
+
+   Scoped to `@media (max-width: 860px)`, the breakpoint this file
+   already uses, so desktop admin is untouched - verified at 0
+   differing pixels across Dashboard, Users, Reports and Settings
+   at 1440, 1024 and 900px.
+   ============================================================ */
+@media (max-width: 860px) {
+    .adm input,
+    .adm select,
+    .adm textarea,
+    .adm-select select,
+    .adm-drop select,
+    .adm-search input { font-size: 16px; }
+
+    .adm-btn,
+    .adm-tab,
+    .adm-select,
+    .adm-drop { min-height: 44px; }
+
+    /* The wrapper is what you actually tap on the pickers - the
+       <select> inside is only as tall as its text. */
+    .adm-select,
+    .adm-drop { display: inline-flex; align-items: center; }
+    /* 44, not 42: the <select> is the element the browser hit-tests,
+       so it has to clear the bar itself, not just its wrapper. */
+    .adm-select select,
+    .adm-drop select { min-height: 44px; }
+
+    .adm-btn { display: inline-flex; align-items: center; justify-content: center; }
+}

@@ -858,3 +858,49 @@
     }
     .dash .stat-card { padding: 16px 14px 14px; }
 }
+
+/* ============================================================
+   USER DASHBOARD - MOBILE CONTROL SIZING
+   ------------------------------------------------------------
+   Measured at 375x812 on the live dashboard (real account, 14
+   expenses): the period <select> rendered at 12.5px, and seven
+   controls were under 44px tall - "New expense" 42px, the period
+   and category pickers 31px, Edit 29px, Delete 29px, Log out 38px,
+   the brand link 34px.
+
+   Both are functional defects rather than taste:
+
+   - Under 16px, iOS Safari zooms the page in when a field or select
+     takes focus and does not zoom back out. On this page that means
+     changing the period silently leaves you on a zoomed, sideways-
+     scrolling dashboard.
+
+   - 44px is the smallest target most people hit reliably with a
+     thumb. A 29px Delete button next to a 29px Edit button is a
+     mis-tap waiting to happen, and here a mis-tap deletes an expense.
+
+   Mobile-only. Above 900px nothing in this block applies and the
+   desktop dashboard is byte-identical.
+   ============================================================ */
+@media (max-width: 900px) {
+    .dash input,
+    .dash select,
+    .dash textarea,
+    .dash .select-inline select { font-size: 16px; }
+
+    /* Height on the control, not the label, so the tap box grows
+       without moving the text or changing the visual rhythm. */
+    .dash .btn,
+    .dash .dash-nav a,
+    .dash .dash-logout { min-height: 44px; }
+
+    /* `.btn-tiny` is the row-level Edit/Delete pair. It keeps its
+       small type - only the box grows. */
+    .dash .btn-tiny { min-height: 44px; padding: 6px 14px; }
+
+    /* The wrapper alone is not enough - the <select> inside it is what
+       the browser makes tappable, and it was rendering at 35px. */
+    .dash .select-inline { min-height: 44px; display: inline-flex; align-items: center; }
+    .dash select,
+    .dash .select-inline select { min-height: 44px; }
+}
