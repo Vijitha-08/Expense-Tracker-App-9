@@ -3,6 +3,7 @@ import {
   FiTrendingUp, FiFolder, FiBarChart2, FiSmartphone,
 } from "react-icons/fi";
 import "./../styles/Features.css";
+import useCardRail from "./useCardRail";
 
 const features = [
   { Icon: FiCreditCard, title: "Expense Tracking",
@@ -23,12 +24,16 @@ const features = [
     description: "Use the application smoothly on desktop and mobile." },
 ];
 
-const Features = () => (
+const Features = () => {
+  // Horizontal rail + auto-advance below 768px only; a no-op above it.
+  const gridRef = useCardRail();
+
+  return (
   <section id="features" className="features-section">
     <p className="feature-tag">SMART FEATURES</p>
     <h2>Everything You Need to Manage Expenses</h2>
 
-    <div className="features-grid">
+    <div className="features-grid" ref={gridRef}>
       {features.map(({ Icon, title, description }) => (
         <div className="feature-card" key={title}>
           <span className="feature-icon" aria-hidden="true"><Icon /></span>
@@ -38,6 +43,7 @@ const Features = () => (
       ))}
     </div>
   </section>
-);
+  );
+};
 
 export default Features;

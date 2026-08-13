@@ -944,3 +944,117 @@ body {
     .hero .stats,
     .how-it-works-section .steps { scroll-behavior: auto; }
 }
+
+/* ============================================================
+   HERO BUTTONS ON MOBILE
+   ------------------------------------------------------------
+   The bug first: "Get Started" is wrapped in a <Link>, so the
+   ANCHOR is the flex item of `.hero-buttons`, not the button.
+   The rules above - `flex: 1 1 auto` at 900px and `flex: 1 1 100%`
+   at 420px - were therefore being applied to a button whose parent
+   is not a flex container, and were silently ignored. That is why
+   Get Started sized itself to its text (170px) while Learn More
+   went full width (343px). Not a design choice; a broken one.
+
+   Two fixes, at two widths:
+     <=900px  the anchor becomes a flex item so the existing
+              intent (two buttons of comparable width) works
+     <=480px  the reviewed layout: both buttons 210px, centred,
+              stacked. Approved at 375px.
+   ============================================================ */
+@media (max-width: 900px) {
+    /* Make the wrapper a real flex item, and let the button fill it. */
+    .hero-buttons > a {
+        display: flex;
+        flex: 1 1 auto;
+        min-width: 140px;
+    }
+    .hero-buttons > a .primary-btn { width: 100%; }
+
+    /* A call to action must never wrap. Caught during review: at one
+       point "Get Started" broke onto two lines over a 1px shortfall. */
+    .hero-buttons button,
+    .hero-buttons .primary-btn { white-space: nowrap; }
+}
+
+/* Phone widths, including the 430px devices the 420px block above
+   misses. Both buttons the same width and centred as a pair.
+   `flex: 0 0 100%` on each forces the row break, so they stack even
+   though 2 x 210px + gap would technically fit at 480px. */
+@media (max-width: 480px) {
+    .hero-buttons { justify-content: center; }
+    .hero-buttons > a {
+        flex: 0 0 100%;
+        justify-content: center;
+        min-width: 0;
+    }
+    .hero-buttons > a .primary-btn { flex: 0 0 auto; width: 210px; }
+    .hero-buttons > button { flex: 0 0 auto; width: 210px; }
+}
+
+/* ============================================================
+   FEATURES + ABOUT AS RAILS TOO
+   ------------------------------------------------------------
+   Added at the repo owner's request, one card per swipe, matching
+   How It Works. Worth recording the trade-off in the file rather
+   than only in a chat: Features has EIGHT cards and About SIX, so
+   at one per swipe the later cards need 7 and 5 swipes to reach.
+   Measured, this shortens the landing page a great deal; the cost
+   is that content past card two is unlikely to be seen. A 2-up
+   rail (halving the swipes) is a one-line change if that becomes
+   the preference - set the widths below to `46%`.
+
+   Selectors are `.features-section .features-grid` and
+   `.about-section .about-grid` (0,2,0) so they beat the plain
+   `.features-grid` / `.about-grid` rules in Features.css and
+   About.css regardless of which stylesheet the bundler emits first.
+   ============================================================ */
+@media (max-width: 768px) {
+    .features-section .features-grid,
+    .about-section .about-grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 14px;
+        padding: 6px 0 16px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .features-section .features-grid::-webkit-scrollbar,
+    .about-section .about-grid::-webkit-scrollbar { display: none; }
+
+    .features-section .features-grid > .feature-card,
+    .about-section .about-grid > .about-card {
+        flex: 0 0 auto;
+        width: 86%;
+        min-width: 0;
+        max-width: 320px;
+        scroll-snap-align: start;
+    }
+
+    /* A sticky :hover lift inside a scroll container leaves one card
+       floating out of line with its neighbours after a tap. */
+    .features-section .features-grid > .feature-card:hover,
+    .about-section .about-grid > .about-card:hover { transform: none; }
+}
+
+@media (max-width: 380px) {
+    .features-section .features-grid > .feature-card,
+    .about-section .about-grid > .about-card { width: 88%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .features-section .features-grid,
+    .about-section .about-grid { scroll-behavior: auto; }
+}

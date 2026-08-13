@@ -3,6 +3,7 @@ import {
   FiBarChart2, FiLock, FiSmartphone,
 } from "react-icons/fi";
 import "./../styles/About.css";
+import useCardRail from "./useCardRail";
 
 const aboutData = [
   { Icon: FiCreditCard, title: "Expense Tracking",
@@ -19,7 +20,11 @@ const aboutData = [
     description: "Use the application smoothly on desktop, tablet, and mobile devices." },
 ];
 
-const About = () => (
+const About = () => {
+  // Horizontal rail + auto-advance below 768px only; a no-op above it.
+  const gridRef = useCardRail();
+
+  return (
   <section className="about-section" id="about">
     <p className="about-tag">ABOUT EXPENSE TRACKER</p>
     <h2>Built to Make Expense Management Simple</h2>
@@ -30,7 +35,7 @@ const About = () => (
       financial goals with a simple, secure, and user-friendly platform.
     </p>
 
-    <div className="about-grid">
+    <div className="about-grid" ref={gridRef}>
       {aboutData.map(({ Icon, title, description }) => (
         <div className="about-card" key={title}>
           <div className="about-icon" aria-hidden="true"><Icon /></div>
@@ -40,6 +45,7 @@ const About = () => (
       ))}
     </div>
   </section>
-);
+  );
+};
 
 export default About;
