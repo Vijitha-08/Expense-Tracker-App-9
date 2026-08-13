@@ -49,6 +49,9 @@ const LoginPage = () => {
 
   return (
     <AuthShell
+      // Puts the sign-in card above the intro copy below 1080px. Only this
+      // page opts in - see PART B in Login.css.
+      variant="login"
       left={
         <AuthIntro
           badge="Welcome back"

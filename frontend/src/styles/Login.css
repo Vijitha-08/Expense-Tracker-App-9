@@ -525,3 +525,80 @@
     .auth-card { padding: 30px 22px; border-radius: var(--r-lg); }
     .auth-card h2 { font-size: 25px; }
 }
+
+/* ============================================================
+   AUTH PAGES ON MOBILE
+   ------------------------------------------------------------
+   Measured on /login at 375x812 before this block: the topbar was
+   138px, the intro column 682px and the card 597px, which put the
+   first input field at y=1103 on an 812px screen. You landed on the
+   sign-in page and had to scroll 291px past a badge, a headline, a
+   paragraph, three pills and a quote before you could see the email
+   box. The Sign In button was two screens down.
+
+   Split deliberately into two parts:
+
+     PART A - defects, so they apply to EVERY auth page
+              (/login, /register, /register/*, /forgot-password).
+              A 15px input and a 32px tap target are wrong
+              everywhere, not just on login.
+
+     PART B - the reorder, scoped to `.auth--login` only, because
+              putting the form above the value-proposition copy is
+              a judgement call that was reviewed for the sign-in
+              page specifically. /register and /forgot-password
+              still have their form below the fold - deliberately
+              left for a separate decision, not an oversight.
+
+   Breakpoint is 1080px to match the existing block above, which is
+   where `.auth-body` already collapses to one column. Above it,
+   nothing here applies and the desktop layout is untouched.
+   ============================================================ */
+
+/* ---------- PART A: applies to every auth page ---------- */
+@media (max-width: 1080px) {
+    /* Two lines of brand text forced the bar to wrap to 138px - a sixth
+       of the screen spent on chrome. The name alone still identifies
+       the page; the tagline is landing-page copy. */
+    .auth-topbar { padding: 12px 16px; flex-wrap: nowrap; gap: 10px; }
+    .auth-brand-sub { display: none; }
+    .auth-back {
+        flex: none;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+    }
+
+    /* 16px is not cosmetic. Below 16px, iOS Safari zooms the whole page
+       in when the field takes focus and does NOT zoom back out on blur,
+       leaving the user on a horizontally-scrolling page mid-login. */
+    .auth-input input { font-size: 16px; }
+
+    /* Tap targets, measured before: eye 32x32, checkbox 17x17,
+       "Forgot password?" 140x16, "Sign up" 62x16. 44px is the smallest
+       target most thumbs hit reliably; the padding goes on the control
+       so the box grows without moving anything on screen. */
+    .auth-eye { width: 44px; height: 44px; }
+    .auth-remember {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+    .auth-remember input[type="checkbox"] { width: 20px; height: 20px; }
+    .auth-forgot,
+    .auth-foot a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+}
+
+/* ---------- PART B: /login only - form first ---------- */
+/* `order` on grid items, so the DOM order is unchanged: the intro still
+   precedes the card in the markup, which is what a screen reader and a
+   no-CSS render follow. Only the visual order flips. */
+@media (max-width: 1080px) {
+    .auth--login .auth-card { order: 1; }
+    .auth--login .auth-left { order: 2; }
+}
