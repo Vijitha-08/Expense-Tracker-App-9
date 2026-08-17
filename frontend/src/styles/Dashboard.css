@@ -21,6 +21,17 @@
     background: var(--page);
 }
 
+/* The one rule in this file that is not scoped under `.dash`, because it is the
+   full-screen state shown BETWEEN routes - there is no container yet. It reads
+   --page and --muted from :root, which stay light, so without this it flashes a
+   white screen on every navigation in dark mode. Handled explicitly rather than
+   by widening the scope selector, which has nothing here to match on. */
+:root[data-theme="dark"] .route-loading {
+    background: var(--dk-page);
+    color: var(--dk-muted);
+    color-scheme: dark;
+}
+
 .dash {
     min-height: 100vh;
     background:
@@ -39,7 +50,7 @@
     justify-content: space-between;
     gap: 16px;
     padding: 14px clamp(16px, 4vw, 40px);
-    background: rgba(255, 255, 255, .82);
+    background: var(--card-veil);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
     position: sticky;
@@ -61,7 +72,7 @@
     display: grid;
     place-items: center;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     font-size: 17px;
 }
 .dash .dash-brand-name {
@@ -95,7 +106,7 @@
     white-space: nowrap;
 }
 .dash .role-user  { background: var(--accent-wash); color: var(--accent); }
-.dash .role-admin { background: #fdf0e6; color: #9a4b06; }
+.dash .role-admin { background: var(--warn-wash); color: var(--warn); }
 
 /* ---------- page heading ---------- */
 .dash .dash-heading {
@@ -146,9 +157,9 @@
 .dash .dash-tab-active {
     background: var(--ink);
     border-color: var(--ink);
-    color: #fff;
+    color: var(--on-accent);
 }
-.dash .dash-tab-active:hover { color: #fff; }
+.dash .dash-tab-active:hover { color: var(--on-accent); }
 
 .dash .count-pill {
     display: inline-grid;
@@ -159,11 +170,11 @@
     margin-left: 6px;
     border-radius: var(--r-pill);
     background: var(--bad);
-    color: #fff;
+    color: var(--on-accent);
     font-size: 11.5px;
     font-weight: 800;
 }
-.dash .dash-tab-active .count-pill { background: #fff; color: var(--ink); }
+.dash .dash-tab-active .count-pill { background: var(--on-accent); color: var(--accent); }
 .dash h3 .count-pill { background: var(--accent); }
 
 /* ---------- body ---------- */
@@ -355,7 +366,7 @@
 }
 .dash .trend-bar:hover { filter: brightness(.97); }
 .dash .trend-bar-solid {
-    background: linear-gradient(180deg, #6d67ea, var(--accent));
+    background: linear-gradient(180deg, var(--accent-lift), var(--accent));
     border-color: var(--accent);
 }
 .dash .trend-label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
@@ -445,7 +456,7 @@
 .dash .breakdown-fill {
     height: 100%;
     border-radius: var(--r-pill);
-    background: linear-gradient(90deg, var(--accent), #6d67ea);
+    background: linear-gradient(90deg, var(--accent), var(--accent-lift));
 }
 .dash .breakdown-count { font-size: 11.5px; color: var(--muted); }
 
@@ -470,7 +481,7 @@
     font-weight: 800;
     margin-top: 1px;
 }
-.dash .spenders li:first-child .spender-rank { background: var(--accent); color: #fff; }
+.dash .spenders li:first-child .spender-rank { background: var(--accent); color: var(--on-accent); }
 .dash .spender-body { flex: 1; min-width: 0; }
 .dash .spender-head {
     display: flex;
@@ -600,9 +611,9 @@
 .dash .chip-active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
 }
-.dash .chip-active:hover { color: #fff; }
+.dash .chip-active:hover { color: var(--on-accent); }
 .dash .chip-count {
     font-size: 11px;
     font-weight: 800;
@@ -717,9 +728,35 @@
 .dash .btn:active { transform: translateY(1px); }
 .dash .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
-.dash .btn-primary { background: var(--accent); color: #fff; }
+.dash .btn-primary { background: var(--accent); color: var(--on-accent); }
 .dash .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .dash .btn-lg { padding: 12px 20px; font-size: 14.5px; border-radius: var(--r-md); }
+
+/* Sits beside Log out in the dashboard top bar. Borrows `.btn-ghost`'s surface
+   and border so the pair reads as one control group; square and icon-only
+   because it carries no label. Height is set from the Log out button's own
+   padding rather than a round number, so the two line up at any font size. */
+.dash .dash-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* 38px, matching the measured height of the Log out button beside it. At
+       40px this button became the tallest thing in the bar and pushed it from
+       67px to 69px, which moved the whole page down 2px - the desktop pixel
+       diff caught it as a 1635px page against main's 1633px. Exactly the same
+       mistake as the auth top bar; measured both times rather than guessed. */
+    width: 38px; height: 38px;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+}
+.dash .dash-theme:hover { color: var(--accent); border-color: var(--accent-line); }
+.dash .dash-theme svg { width: 18px; height: 18px; }
 
 .dash .btn-ghost {
     background: var(--surface);
@@ -749,9 +786,9 @@
     font-weight: 600;
     border: 1px solid transparent;
 }
-.dash .alert-error { background: var(--bad-wash);  color: var(--bad);  border-color: #f6cfcc; }
-.dash .alert-warn  { background: var(--warn-wash); color: var(--warn); border-color: #f3dfb6; }
-.dash .alert-ok    { background: var(--ok-wash);   color: var(--ok);   border-color: #c6e8d5; }
+.dash .alert-error { background: var(--bad-wash);  color: var(--bad);  border-color: var(--bad-line); }
+.dash .alert-warn  { background: var(--warn-wash); color: var(--warn); border-color: var(--warn-line); }
+.dash .alert-ok    { background: var(--ok-wash);   color: var(--ok);   border-color: var(--ok-line); }
 
 .dash .empty-state {
     padding: 34px 20px;
@@ -768,7 +805,7 @@
 .dash .drawer-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(15, 23, 42, .45);
+    background: var(--scrim);
     animation: drawer-fade .16s ease-out;
 }
 .dash .drawer {

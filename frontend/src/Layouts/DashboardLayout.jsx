@@ -1,6 +1,7 @@
 import { useNavigate, Link } from "react-router-dom";
-import { FiTrendingUp, FiLogOut, FiShield, FiUser } from "react-icons/fi";
+import { FiTrendingUp, FiLogOut, FiShield, FiUser, FiSun, FiMoon } from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
+import { useDisplay } from "../context/useDisplay";
 import "../styles/Dashboard.css";
 
 const ROLE_LOOK = {
@@ -15,6 +16,11 @@ const DashboardLayout = ({
     title, subtitle, children, actions, tabs, activeTab, onTabChange,
 }) => {
     const { user, logout } = useAuth();
+    // The user side has no Settings page, so this bar is the only place a
+    // theme control can live. Same shared preference as the navbar and the
+    // admin sidebar.
+    const { resolvedTheme, toggleTheme } = useDisplay();
+    const dark = resolvedTheme === "dark";
     const navigate = useNavigate();
 
     const role = ROLE_LOOK[user?.role] || { label: user?.role, Icon: FiUser };
@@ -40,6 +46,15 @@ const DashboardLayout = ({
                             <RoleIcon aria-hidden="true" /> {role.label}
                         </span>
                     </span>
+                    <button
+                        type="button"
+                        className="dash-theme"
+                        onClick={toggleTheme}
+                        aria-label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
+                        title={dark ? "Switch to light" : "Switch to dark"}
+                    >
+                        {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
+                    </button>
                     <button className="btn btn-ghost" onClick={handleLogout}>
                         <FiLogOut aria-hidden="true" /> Log out
                     </button>

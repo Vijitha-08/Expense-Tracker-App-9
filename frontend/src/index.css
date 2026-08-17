@@ -89,6 +89,17 @@
   --on-accent:  #ffffff;
   --on-ok:      #ffffff;
 
+  /* One step LIGHTER than --accent, for the two chart gradients on the user
+     dashboard. Not --accent-hover, which goes the other way: #6d67ea is
+     rgb(109,103,234) and --accent-hover is rgb(67,56,202). Substituting one
+     for the other inverted both gradients, which the light-mode pixel diff
+     caught as a 26,000-pixel change across the bar chart. */
+  --accent-lift: #6d67ea;
+
+  /* A frosted white veil over the user dashboard's sticky top bar. On dark it
+     has to become a dark veil or the bar turns into a bright band. */
+  --card-veil:  rgba(255, 255, 255, .82);
+
   /* The hairline highlight on the auth card, and the tint an auth field takes
      while focused. */
   --card-edge:   rgba(255, 255, 255, .9);
@@ -212,6 +223,21 @@
 
   /* The bloom behind the hero. A pale lilac would be a bright smear here. */
   --dk-glow:        #1b1f3d;
+  --dk-card-veil:   rgba(15, 19, 30, .82);
+  /* Still a lift, i.e. lighter than --dk-accent, so the gradient runs the
+     same direction it does in light. */
+  --dk-accent-lift: #b3bbff;
+
+  /* The user dashboard's category chart carries an 11-hue categorical palette
+     (CategoryDonut.jsx). Measured against the dark card surface #171d2c, TEN of
+     the eleven already clear the 3.0:1 that a graphical object needs, so they
+     are reused unchanged - a categorical palette should not be redesigned per
+     theme or the same category changes colour between them.
+
+     The exception is the first hue, #4f46e5, at 2.68:1 - the deep indigo that
+     reads well on white and sinks into a dark card. Lifted to the same value
+     the accent uses in dark, which measures 7.33:1. */
+  --dk-chart-1:     #9ba4ff;
   --dk-focus-ring:  rgba(155, 164, 255, .20);
   --dk-scrim:       rgba(3, 5, 10, .66);
   --dk-img-shadow:  rgba(0, 0, 0, .45);

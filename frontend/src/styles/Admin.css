@@ -1039,16 +1039,42 @@
    ============================================================ */
 @media (max-width: 860px) {
 
-    /* ---- 1. KPI bands, two across ----
+    /* ---- 1. KPI bands ----
        `minmax(0, 1fr)` rather than plain `1fr`: a 1fr track has an
        automatic minimum of its content's min-content width, so one
        long unbreakable figure (~₹3.69 L) would push its own column
        wider than half and shove the other card off-screen. */
-    .adm-grid-3,
     .adm-grid-4,
-    .adm-cmp,
     .adm-upanel,
     .adm-dstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    /* ---- The big KPI cards go ONE across, not two ----------------------
+       Two across gives each card a 118px inner width, and `.adm-kpi-val`
+       is 32px type (25px for the -sm variant). Measured at 390px with a
+       real category name:
+
+         "Entertainment"  content 193px in a 118px box  -> 75px OVER
+         the whole Biggest-category card                -> 49px OVER
+         "~₹34.18 L"      content 142px in a 118px box  -> 24px OVER
+         "~₹1.42 Cr"                                    ->  3px OVER
+
+       At 360px the worst case is 90px. The text ran clean outside the
+       card's rounded edge, which is what it looked like on a phone.
+
+       Note this is NOT the same call as the count cards below, which stay
+       two across. The note there - that four one-up count cards become "a
+       384px column of mostly whitespace" - is about cards holding a single
+       DIGIT. These hold a word, and a word cannot be made narrower. Going
+       one-up also closes the hole that used to sit beside the third card,
+       since three cards never divided evenly into two columns.
+       ------------------------------------------------------------------ */
+    .adm-grid-3,
+    .adm-cmp { grid-template-columns: minmax(0, 1fr); }
+
+    /* A backstop, not the fix: one-up gives "Entertainment" room to spare,
+       but a longer name ("Office Supplies & Stationery") would overflow
+       again, and a figure must break rather than escape its card. */
+    .adm-kpi-val { overflow-wrap: anywhere; }
 
     /* Left deliberately at one column by the block above:
          .adm-row2   - label + input form pairs, not cards
@@ -1062,6 +1088,58 @@
        wrap to two lines rather than overflow the card. */
     .adm-ig { gap: 12px; padding: 16px 14px; }
     .adm-ig-n { overflow-wrap: anywhere; }
+    /* At 360px "Administrators" overflowed its half-width card by 13px.
+       The first attempt put `overflow-wrap: anywhere` on the label, which
+       fixed the overflow but broke the word mid-way ("Administrato / rs") even
+       at 390px where it would otherwise have fitted - `anywhere` reduces an
+       element's min-content width, so the flex row starts allocating less
+       space than the word needs. `break-word` does not do that, so it only
+       breaks when there is genuinely no room.
+       The width is found by shrinking the ICON instead: 44px of icon in a
+       ~150px card leaves the label ~94px, and "Administrators" needs ~90px at
+       11px - too close. 36px of icon gives it 8px of slack. */
+    .adm-ig-ico { width: 36px; height: 36px; border-radius: 11px; }
+    .adm-ig-ico svg { width: 18px; height: 18px; }
+    .adm-ig-l { font-size: 11px; overflow-wrap: break-word; }
+    /* A flex item will not shrink below its content width without this, so
+       without it the card's own min-content pushed the two-column grid 2px
+       past its container at 360px. Cheaper than breaking the word. */
+    .adm-ig { min-width: 0; }
+    .adm-ig > span { min-width: 0; }
+
+    /* ---- The toolbar keeps Period and Refresh on one row --------------
+       `.adm-drop` was free to grow, so it took the whole row and pushed
+       Refresh onto a second line, costing ~70px above the fold on every
+       admin page. Letting it SHRINK instead puts the two back on one row.
+       `min-width: 0` is what actually permits that - a flex item will not go
+       below its content width without it.
+
+       Note what is NOT here: `max-width: 100%` on the <select>. The first
+       attempt set it, which overrode the `max-width: 190px` on the base
+       `.adm-drop select` rule further up this file. On Insights, whose label
+       is the long "This month vs last month", the select then grew from 190
+       to 255px, the control from 312 to 377, and the whole PAGE from 390 to
+       395px - a horizontal scrollbar on every phone. The 190px cap is
+       load-bearing; only the wrapper is allowed to flex. */
+    .adm-head-right,
+    .adm-toolbar { flex-wrap: wrap; gap: 10px; min-width: 0; max-width: 100%; }
+    .adm-head-right .adm-drop,
+    .adm-head-right .adm-select { flex: 1 1 auto; min-width: 0; }
+    .adm-head-right .adm-drop select,
+    .adm-head-right .adm-select select { min-width: 0; }
+    .adm-head-right .adm-btn { flex: 0 0 auto; }
+
+    /* ---- The dashboard user row wraps onto two lines ------------------
+       Avatar + name on the first line, role chip + amount on the second.
+       The name was being squeezed to a 32px box by the chip and the figure
+       beside it - 19px of overflow at 390px and 49px at 360px - because a
+       flex row cannot fit four things in 340px. Nothing is hidden; the row
+       grows about 20px. `flex-basis: 100%` on the trailing pair is what
+       forces the break. */
+    .adm-urow-static { flex-wrap: wrap; row-gap: 8px; }
+    .adm-urow-static .adm-urow-name { flex: 1 1 auto; min-width: 0; }
+    .adm-urow-static .adm-role { order: 2; }
+    .adm-urow-static .adm-urow-amt { order: 2; margin-left: auto; text-align: right; }
 
     /* ---- 2. Sidebar behind a toggle ----
        The two wrappers added in AdminLayout.jsx are `display: contents`
@@ -1081,9 +1159,18 @@
     .adm-side-top {
         display: flex;
         align-items: center;
-        justify-content: space-between;
         gap: 12px;
     }
+
+    /* The menu button sits at the LEFT edge, before the brand. It is second
+       in the DOM (AdminLayout renders brand then toggle) so `order` moves it
+       visually without touching the markup, and the auto margin moves from
+       the toggle to the brand: whichever element comes first has to be the
+       one that absorbs the free space, or the row stops sitting flush.
+       `justify-content: space-between` is dropped for the same reason - with
+       an auto margin doing the work it would fight it. */
+    .adm-nav-toggle { order: -1; }
+    .adm-side-top .adm-brand { margin-right: auto; }
 
     /* The brand loses its 22px bottom padding - it is a bar now, not a
        heading above a list. */
@@ -1119,12 +1206,22 @@
     /* `margin-top: auto` only makes sense in a full-height column. */
     .adm-side-panel .adm-side-foot { margin-top: 12px; }
 
-    /* Two columns of links instead of one long list - the whole open
-       panel then fits a phone screen without scrolling. */
+    /* One link per row. This was two columns, on the reasoning that "the
+       whole open panel then fits a phone screen without scrolling" - so
+       before changing it the taller layout was measured:
+
+         390x844   483px -> 562px   fits
+         360x640   483px -> 562px   fits
+         430x932   468px -> 562px   fits
+
+       562px still clears the shortest of those viewports, so the original
+       objection no longer holds. A single column also reads as a menu
+       rather than a grid, and stops the eye having to choose between two
+       columns for the next item. */
     .adm-side-panel .adm-nav {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 6px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
     }
     .adm-side-panel .adm-nav-link { padding: 12px; }
 

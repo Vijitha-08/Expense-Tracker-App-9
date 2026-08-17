@@ -23,6 +23,11 @@ body {
      .site   the landing page wrapper added to Home.jsx
      .auth   the shell every /login, /register and /forgot-password
              page already renders
+     .dash   the user dashboard's own container
+
+   `.dash` needed no scoping work at all: 156 of the 157 top-level rules in
+   Dashboard.css already sit under it, which makes it the best-behaved of the
+   three stylesheets and a one-word addition here.
 
    This block does NOT redefine anything globally. It re-declares the SAME
    token names the light `:root` uses, but locally - so every `var(--page)`,
@@ -31,17 +36,18 @@ body {
    these two subtrees and stays light everywhere else. That is what makes this
    a ~40-line change rather than a rewrite of 94 var() references.
 
-   The user dashboard (`.dash`) is deliberately NOT in this list. It has no
-   dark styling of its own yet, and it paints its own full-height background,
-   so it stays light and is unaffected. Flipping `:root` instead would have
-   dragged it dark with nothing written for it.
+   Still NOT in this list: nothing. Every surface the app renders is now
+   covered, which is the point at which flipping `:root` would have been the
+   simpler design. It is kept scoped anyway - `:root` would also recolour
+   anything added later that has no dark styling written for it, and the
+   scoped form makes each surface opt in deliberately.
 
    Values come from the `--dk-*` block in index.css, which is the single
    definition shared with Admin.css. Nothing here is a literal colour, so the
    admin panel and the public site cannot drift apart - which is the specific
    failure index.css already documents for --ok.
    ============================================================ */
-:root[data-theme="dark"] :is(.site, .auth) {
+:root[data-theme="dark"] :is(.site, .auth, .dash) {
     --page:         var(--dk-page);
     --page-alt:     var(--dk-page-alt);
     --surface:      var(--dk-surface);
@@ -76,6 +82,11 @@ body {
     --scrim:       var(--dk-scrim);
     --img-shadow:  var(--dk-img-shadow);
     --field-focus: var(--dk-field);
+    --card-veil:   var(--dk-card-veil);
+    --accent-lift: var(--dk-accent-lift);
+    /* Only the first chart hue needs a dark value; see index.css for why the
+       other ten are shared between the themes. */
+    --chart-1:     var(--dk-chart-1);
     /* A white hairline highlight is a light-mode trick; on dark it is a seam. */
     --card-edge:   var(--dk-border);
 
@@ -113,7 +124,7 @@ body {
    page instead - the landing page measured 3852px against main's 3851px in the
    light-mode diff. A shadow paints the same hairline and costs no layout. */
 .footer { box-shadow: inset 0 1px 0 var(--footer-edge, transparent); }
-:root[data-theme="dark"] :is(.site, .auth) { --footer-edge: var(--dk-border); }
+:root[data-theme="dark"] :is(.site, .auth, .dash) { --footer-edge: var(--dk-border); }
 
 /* body sits OUTSIDE both scopes, so it keeps the light --page and would show
    as a pale strip when a dark page is over-scrolled - very visible on macOS,
@@ -810,9 +821,15 @@ body {
        button stays on the bar, `.nav-actions` drops into the panel. */
     .nav-right { display: contents; }
 
-    /* The auto margin moves from `.nav-toggle` to `.nav-theme` - whichever of
-       the two comes first has to be the one that absorbs the free space, or
-       the pair no longer sits flush right. */
+    /* Menu button at the LEFT edge, matching the admin panel - both halves of
+       the app should open their menu from the same corner. `.nav-toggle` is
+       second in the DOM (after the logo), so `order` moves it visually without
+       touching Navbar.jsx.
+
+       The theme toggle stays on the right, so the auto margin lives on
+       `.nav-theme`: whichever element comes first has to be the one that
+       absorbs the free space, or the pair no longer sits flush right. */
+    .nav-toggle { order: -1; }
     .nav-theme {
         order: 1;
         margin-left: auto;
@@ -820,7 +837,6 @@ body {
         color: var(--ink);
     }
     .nav-theme svg { width: 20px; height: 20px; }
-    .nav-toggle { order: 2; }
 
     /* The links become a panel under the bar. `display:none` rather than a
        height transition: a hidden panel must not be reachable by tab. */
