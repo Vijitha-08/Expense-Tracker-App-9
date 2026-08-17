@@ -184,31 +184,31 @@
        inverse of light mode: there, a card is WHITE and lifts off a grey
        page. Here a card has to lift by getting lighter than the page.
 
-         sidebar  #0b0e16   furthest back
-         page     #0f131e
-         surface  #171d2c   cards and panels
-         field    #1d2434   inputs, row hover, recessed strips inside a card
-         page-alt #252d42   neutral chip and track fills
+         sidebar  var(--dk-recess)   furthest back
+         page     var(--dk-page)
+         surface  var(--dk-surface)   cards and panels
+         field    var(--dk-field)   inputs, row hover, recessed strips inside a card
+         page-alt var(--dk-page-alt)   neutral chip and track fills
 
        Steps are ~1.05-1.13:1 apart. That is intentionally small: on a dark
        screen a bigger jump between a page and its cards reads as a glare
        rather than as elevation. The borders do the real separating work,
-       which is why --a-border is a visible #2b3348 here rather than the
+       which is why --a-border is a visible var(--dk-border) here rather than the
        near-invisible hairline light mode can get away with. */
-    --a-page:         #0f131e;
-    --a-page-alt:     #252d42;
-    --a-surface:      #171d2c;
-    --a-field:        #1d2434;
-    --a-border:       #2b3348;
-    --a-border-strong:#414a68;
+    --a-page:         var(--dk-page);
+    --a-page-alt:     var(--dk-page-alt);
+    --a-surface:      var(--dk-surface);
+    --a-field:        var(--dk-field);
+    --a-border:       var(--dk-border);
+    --a-border-strong:var(--dk-border-strong);
 
     /* Four ranks, every one of them clearing 4.5:1 on all four surfaces -
-       measured against the tightest of them, --a-page-alt #252d42:
+       measured against the tightest of them, --a-page-alt var(--dk-page-alt):
 
-         ink        #e9ecf7   11.62:1
-         ink-soft   #c5cbde    8.46:1
-         muted      #a0a9c2    5.84:1
-         muted-soft #8b94ab    4.52:1
+         ink        var(--dk-ink)   11.62:1
+         ink-soft   var(--dk-ink-soft)    8.46:1
+         muted      var(--dk-muted)    5.84:1
+         muted-soft var(--dk-muted-soft)    4.52:1
 
        --a-muted-soft is deliberately not a straight port of the light
        #94a3b8. That value measures 2.56:1 on white, which is a pre-existing
@@ -216,29 +216,29 @@
        `.adm-hint`, `.adm-zero`, `.adm-fld-hint` and the `.adm-list-grp`
        headings, none of which are decorative, so the dark value is set where
        it actually passes rather than merely darkened to match. */
-    --a-ink:          #e9ecf7;
-    --a-ink-soft:     #c5cbde;
-    --a-muted:        #a0a9c2;
-    --a-muted-soft:   #8b94ab;
+    --a-ink:          var(--dk-ink);
+    --a-ink-soft:     var(--dk-ink-soft);
+    --a-muted:        var(--dk-muted);
+    --a-muted-soft:   var(--dk-muted-soft);
 
     /* Accent lightens from #4f46e5 to clear the dark card. --a-on-accent
        flips to near-black in step: see the note in the `.adm` block for why
        one accent cannot serve both jobs on a dark panel. */
-    --a-accent:       #9ba4ff;
-    --a-accent-hover: #b3bbff;
-    --a-accent-wash:  #1c2140;
-    --a-accent-line:  #333c66;
-    --a-on-accent:    #0f131e;
+    --a-accent:       var(--dk-accent);
+    --a-accent-hover: var(--dk-accent-hover);
+    --a-accent-wash:  var(--dk-accent-wash);
+    --a-accent-line:  var(--dk-accent-line);
+    --a-on-accent:    var(--dk-on-accent);
 
-    --a-ok:           #34c46f;
-    --a-ok-wash:      #0e2a1b;
-    --a-ok-line:      #1d4a33;
-    --a-warn:         #d69e2e;
-    --a-warn-wash:    #2c2211;
-    --a-danger:       #ff8a8a;
-    --a-danger-wash:  #331a1c;
-    --a-danger-line:  #5b2b2e;
-    --a-danger-edge:  #5b2b2e;
+    --a-ok:           var(--dk-ok);
+    --a-ok-wash:      var(--dk-ok-wash);
+    --a-ok-line:      var(--dk-ok-line);
+    --a-warn:         var(--dk-warn);
+    --a-warn-wash:    var(--dk-warn-wash);
+    --a-danger:       var(--dk-bad);
+    --a-danger-wash:  var(--dk-bad-wash);
+    --a-danger-line:  var(--dk-bad-line);
+    --a-danger-edge:  var(--dk-bad-line);
     --a-danger-soft:  #241419;
     --a-danger-rule:  #45222a;
     /* one step ABOVE the danger panel it sits on, so it still reads as a button */
@@ -247,10 +247,10 @@
     /* The sidebar was ALREADY dark in light mode, which is the one thing that
        makes this theme awkward: leave it at #151a30 and it ends up lighter
        than the cards beside it, so the panel reads inside-out. It goes one
-       step behind the page instead, and because #0b0e16 against #0f131e is
+       step behind the page instead, and because var(--dk-recess) against var(--dk-page) is
        only 1.06:1 - not a visible edge on its own - it gets an explicit
        border-right below. */
-    --a-side:         #0b0e16;
+    --a-side:         var(--dk-recess);
     --a-side-ink:     #f2f4fb;
     --a-side-link:    #aeb6d4;
     --a-side-dim:     #838ca8;
@@ -268,16 +268,16 @@
     /* An input must not turn WHITE on focus. It gets lighter, which is the
        same signal in the other direction. */
     --a-focus-bg:     #232b3e;
-    /* 1.27:1 above the #252d42 track - enough to read as raised, and the
+    /* 1.27:1 above the var(--dk-page-alt) track - enough to read as raised, and the
        lightest value that still keeps --a-accent text on it at 4.69:1. */
-    --a-raised:       #333d59;
+    --a-raised:       var(--dk-raised);
     /* The knob stays near-white in both themes: it reads as the moving part
        against the track either way, and on the ON state it sits on the light
        indigo fill, so it is deliberately brighter than the surface. */
-    --a-knob:         #e9ecf7;
+    --a-knob:         var(--dk-ink);
 
     /* The lead KPI card keeps a filled indigo treatment, but DEEPER than the
-       accent rather than lighter. Filling it with #9ba4ff would put the
+       accent rather than lighter. Filling it with var(--dk-accent) would put the
        brightest block on the page in the top-left corner of every dashboard
        and drown everything next to it. #ffffff on #302a86 is 9.6:1. */
     --a-lead-from:    #302a86;
@@ -300,15 +300,15 @@
     --a-chart-3: #8b93ff;
     --a-chart-4: #7c8cf8;
     --a-chart-5: #6970dd;
-    --a-chart-track: #252d42;
+    --a-chart-track: var(--dk-page-alt);
 
-    --a-scrim: rgba(3, 5, 10, .66);
+    --a-scrim: var(--dk-scrim);
 
     /* Light-mode shadows are near-black at low alpha, which does nothing on a
        dark background - a card ends up with no edge at all. Deepened, and the
        borders above carry most of the separation. */
-    --a-sh-sm: 0 1px 2px rgba(0, 0, 0, .30);
-    --a-sh-md: 0 4px 16px rgba(0, 0, 0, .38);
+    --a-sh-sm: var(--dk-shadow-sm);
+    --a-sh-md: var(--dk-shadow-md);
 
     /* Makes the browser render its own furniture dark: the native dropdown
        list behind every <select>, the scrollbars, the caret and the focus

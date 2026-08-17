@@ -15,12 +15,120 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* ============================================================
+   DARK THEME - PUBLIC SURFACES
+   ============================================================
+   Two scopes, both of which already existed as real elements:
+
+     .site   the landing page wrapper added to Home.jsx
+     .auth   the shell every /login, /register and /forgot-password
+             page already renders
+
+   This block does NOT redefine anything globally. It re-declares the SAME
+   token names the light `:root` uses, but locally - so every `var(--page)`,
+   `var(--surface)` and `var(--muted)` already written in App.css,
+   About.css, Features.css, HowItWorks.css and Login.css resolves dark inside
+   these two subtrees and stays light everywhere else. That is what makes this
+   a ~40-line change rather than a rewrite of 94 var() references.
+
+   The user dashboard (`.dash`) is deliberately NOT in this list. It has no
+   dark styling of its own yet, and it paints its own full-height background,
+   so it stays light and is unaffected. Flipping `:root` instead would have
+   dragged it dark with nothing written for it.
+
+   Values come from the `--dk-*` block in index.css, which is the single
+   definition shared with Admin.css. Nothing here is a literal colour, so the
+   admin panel and the public site cannot drift apart - which is the specific
+   failure index.css already documents for --ok.
+   ============================================================ */
+:root[data-theme="dark"] :is(.site, .auth) {
+    --page:         var(--dk-page);
+    --page-alt:     var(--dk-page-alt);
+    --surface:      var(--dk-surface);
+    --field:        var(--dk-field);
+    --border:       var(--dk-border);
+    --border-strong:var(--dk-border-strong);
+
+    --ink:          var(--dk-ink);
+    --ink-soft:     var(--dk-ink-soft);
+    --muted:        var(--dk-muted);
+    --muted-soft:   var(--dk-muted-soft);
+
+    --accent:       var(--dk-accent);
+    --accent-hover: var(--dk-accent-hover);
+    --accent-wash:  var(--dk-accent-wash);
+    --accent-line:  var(--dk-accent-line);
+    --accent-deep:  var(--dk-accent);
+    --on-accent:    var(--dk-on-accent);
+
+    --ok:        var(--dk-ok);    --ok-wash:   var(--dk-ok-wash);   --ok-line:   var(--dk-ok-line);
+    --warn:      var(--dk-warn);  --warn-wash: var(--dk-warn-wash); --warn-line: var(--dk-warn-line);
+    --bad:       var(--dk-bad);   --bad-wash:  var(--dk-bad-wash);  --bad-line:  var(--dk-bad-line);
+    --on-ok:     var(--dk-on-accent);
+
+    /* The primary action inverts: light fill, dark label. */
+    --fill:       var(--dk-fill);
+    --on-fill:    var(--dk-on-fill);
+    --fill-hover: var(--dk-fill-hover);
+
+    --glow:        var(--dk-glow);
+    --focus-ring:  var(--dk-focus-ring);
+    --scrim:       var(--dk-scrim);
+    --img-shadow:  var(--dk-img-shadow);
+    --field-focus: var(--dk-field);
+    /* A white hairline highlight is a light-mode trick; on dark it is a seam. */
+    --card-edge:   var(--dk-border);
+
+    --shadow-sm: var(--dk-shadow-sm);
+    --shadow-md: var(--dk-shadow-md);
+    --shadow-lg: var(--dk-shadow-lg);
+
+    /* The footer is the one part of the LIGHT site that is already dark, so in
+       dark mode it would end up lighter than the cards above it and the page
+       would read inside-out - the same problem the admin sidebar had. It drops
+       one step behind the page instead, and because that is only ~1.06:1 away
+       it gets an explicit top border below rather than relying on the value. */
+    --footer:      var(--dk-recess);
+    --footer-ink:  var(--dk-ink-soft);
+    --footer-head: var(--dk-ink);
+    --footer-dim:  var(--dk-muted);
+    --footer-rule: var(--dk-border);
+    --footer-fill:    rgba(255, 255, 255, .06);
+    --footer-fill-hi: rgba(255, 255, 255, .11);
+
+    /* Native furniture - the dropdown list behind a <select>, scrollbars, the
+       caret and the default focus ring - so a dark page does not open a white
+       menu. Scoped here, not on :root, so the light half keeps light controls. */
+    color-scheme: dark;
+}
+
+/* The footer / page edge. In light mode the navy block separates itself; in
+   dark it is a step behind a dark page and needs the boundary drawn.
+
+   An inset box-shadow, NOT `border-top: 1px solid transparent`. The border was
+   the first attempt and it was wrong for the same reason it was wrong on the
+   admin sidebar: a transparent border still occupies its 1px of layout. There
+   it ate into the sidebar's fixed 250px width; here the footer has no fixed
+   width, but its HEIGHT comes from its content, so the 1px was added to the
+   page instead - the landing page measured 3852px against main's 3851px in the
+   light-mode diff. A shadow paints the same hairline and costs no layout. */
+.footer { box-shadow: inset 0 1px 0 var(--footer-edge, transparent); }
+:root[data-theme="dark"] :is(.site, .auth) { --footer-edge: var(--dk-border); }
+
+/* body sits OUTSIDE both scopes, so it keeps the light --page and would show
+   as a pale strip when a dark page is over-scrolled - very visible on macOS,
+   where the rubber-band reveals it under a dark footer. Safe to set globally:
+   every route paints its own full-height background over it (`.adm`, `.dash`,
+   `.auth` and the landing sections all do), so this is only ever seen in the
+   over-scroll gutter. */
+:root[data-theme="dark"] body { background: var(--dk-page); }
+
 .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 20px 8%;
-    background: white;
+    background: var(--surface);
     box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
     position: sticky;
     top: 0;
@@ -47,52 +155,20 @@ body {
     color: var(--accent);
 }
 
-.login-btn {
-    padding: 12px 25px;
-    border: none;
-    border-radius: 8px;
-    background: var(--accent);
-    color: white;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.login-btn:hover {
-    background: var(--accent);
-}
-
 .nav-actions {
     display: flex;
     align-items: center;
     gap: 20px;
 }
 
-.theme-btn {
-    width: 42px;
-    height: 42px;
-    border: 1px solid #ddd;
-    border-radius: 50%;
-    background: white;
-    cursor: pointer;
-    font-size: 18px;
-}
-
-.login-link {
-    text-decoration: none;
-    color: #333;
-    font-weight: 500;
-}
-
-.login-btn {
-    background: #000;
-    color: white;
-    border: none;
-    padding: 12px 22px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 600;
-}
+/* REMOVED here: `.login-btn` (declared twice, with conflicting values),
+   `.login-link`, and a `.theme-btn` stub. No JSX rendered any of them - the
+   navbar has used `.nav-btn--ghost` / `.nav-btn--primary` since Navbar.jsx was
+   rewritten, and the abandoned `.theme-btn` was a 42px circle that never
+   appeared on screen. Checked by scanning every className token actually
+   rendered across all .jsx, not by eye. `.login-btn` and `.login-link` are
+   also dropped from the shared selector list further down, which is why that
+   rule now reads `.primary-btn, .secondary-btn`. */
 
 
 /* ================= HERO SECTION ================= */
@@ -149,13 +225,11 @@ body {
 }
 
 .primary-btn,
-.secondary-btn,
-.login-btn,
-.login-link {
+.secondary-btn {
     width: 170px;
     height: 50px;
     background: var(--accent);
-    color: white;
+    color: var(--on-accent);
     border: none;
     border-radius: 12px;
     cursor: pointer;
@@ -213,7 +287,7 @@ body {
 .hero-image img {
     width: 100%;
     border-radius: 24px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, .1);
+    box-shadow: 0 15px 35px var(--img-shadow);
 }
 
 
@@ -281,7 +355,7 @@ body {
 }
 
 .step {
-    background: white;
+    background: var(--surface);
     padding: 30px;
     border-radius: 15px;
     width: 300px;
@@ -308,7 +382,7 @@ body {
 
 .contact {
     padding: 80px 8%;
-    background: white;
+    background: var(--surface);
     text-align: center;
 }
 
@@ -423,7 +497,7 @@ body {
 
 .footer hr {
     margin: 40px 0 20px;
-    border: 1px solid #334155;
+    border: 1px solid var(--footer-rule);
 }
 
 .footer-bottom {
@@ -473,13 +547,13 @@ body {
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, .12);
+    background: var(--footer-fill);
     color: inherit;
     font-size: 16px;
     text-decoration: none;
     transition: background .15s ease;
 }
-.social-icons a:hover { background: rgba(255, 255, 255, .22); }
+.social-icons a:hover { background: var(--footer-fill-hi); }
 
 /* ============================================================
    Landing-page refinements to match the reference UI:
@@ -514,19 +588,40 @@ body {
     cursor: pointer;
     transition: transform .12s ease, background .14s ease, border-color .14s ease;
 }
+.nav-right { display: flex; align-items: center; gap: 10px; }
+
+/* Matches `.nav-btn`'s 42px box and border so the three controls in the bar
+   line up, but square-ish and icon-only rather than a labelled pill. */
+.nav-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px; height: 42px;
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    transition: color .14s ease, border-color .14s ease;
+}
+.nav-theme:hover { color: var(--accent); border-color: var(--accent-line); }
+.nav-theme svg { width: 18px; height: 18px; }
+
 .nav-btn:hover { transform: translateY(-1px); }
 .nav-btn--ghost:hover { border-color: var(--accent-line); color: var(--accent); }
 .nav-btn--primary {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: #fff;
+    background: var(--fill);
+    border-color: var(--fill);
+    color: var(--on-fill);
 }
-.nav-btn--primary:hover { background: #1c2740; }
+.nav-btn--primary:hover { background: var(--fill-hover); }
 
 /* ---- hero ---- */
 .hero {
     background:
-        radial-gradient(1100px 520px at 88% -12%, #eceefe 0%, rgba(236,238,254,0) 62%),
+        radial-gradient(1100px 520px at 88% -12%, var(--glow) 0%, transparent 62%),
         linear-gradient(180deg, var(--page) 0%, var(--page-alt) 100%);
     padding: 68px 6% 84px;
 }
@@ -565,10 +660,10 @@ body {
     transition: transform .12s ease, background .14s ease;
 }
 .hero-buttons .primary-btn {
-    background: var(--ink); color: #fff; border-color: var(--ink);
+    background: var(--fill); color: var(--on-fill); border-color: var(--fill);
 }
 .hero-buttons button:hover { transform: translateY(-1px); }
-.hero-buttons .primary-btn:hover { background: #1c2740; }
+.hero-buttons .primary-btn:hover { background: var(--fill-hover); }
 
 /* roomier stat cards - the originals were fixed 120x100 blue blocks */
 .stats { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -639,27 +734,27 @@ body {
 .contact-form input:focus, .contact-form textarea:focus {
     outline: none; border-color: var(--accent);
     background: var(--surface);
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, .12);
+    box-shadow: 0 0 0 4px var(--focus-ring);
 }
 .contact-form button {
     height: 52px;
     border: none;
     border-radius: var(--r-md);
-    background: var(--ink);
-    color: #fff;
+    background: var(--fill);
+    color: var(--on-fill);
     font-family: inherit; font-size: 15.5px; font-weight: 700;
     cursor: pointer;
 }
-.contact-form button:hover { background: #1c2740; }
+.contact-form button:hover { background: var(--fill-hover); }
 
 /* ---- footer ---- */
-.footer { background: var(--ink); color: #cbd5e1; }
-.footer-section h2 { color: #fff; font-weight: 800; letter-spacing: -.02em; }
-.footer-section h3 { color: #fff; font-size: 15px; font-weight: 700; }
-.footer-section p, .footer-section ul li a { color: #94a3b8; font-size: 14px; }
-.footer-section ul li a:hover, .footer-links a:hover { color: #fff; }
-.footer-links a { color: #94a3b8; font-size: 13.5px; }
-.footer-bottom p { color: #94a3b8; font-size: 13.5px; }
+.footer { background: var(--footer); color: var(--footer-ink); }
+.footer-section h2 { color: var(--footer-head); font-weight: 800; letter-spacing: -.02em; }
+.footer-section h3 { color: var(--footer-head); font-size: 15px; font-weight: 700; }
+.footer-section p, .footer-section ul li a { color: var(--footer-dim); font-size: 14px; }
+.footer-section ul li a:hover, .footer-links a:hover { color: var(--footer-head); }
+.footer-links a { color: var(--footer-dim); font-size: 13.5px; }
+.footer-bottom p { color: var(--footer-dim); font-size: 13.5px; }
 
 /* ============================================================
    Mobile
@@ -702,7 +797,6 @@ body {
         justify-content: center;
         /* 44px is the smallest target most people can hit reliably. */
         width: 44px; height: 44px;
-        margin-left: auto;
         border: 1px solid var(--border);
         border-radius: var(--r-sm);
         background: var(--surface);
@@ -710,6 +804,23 @@ body {
         cursor: pointer;
     }
     .nav-toggle svg { width: 21px; height: 21px; }
+
+    /* The wrapper stops being a box, so the toggle and the buttons become flex
+       items of the bar again and each can follow its own rule: the theme
+       button stays on the bar, `.nav-actions` drops into the panel. */
+    .nav-right { display: contents; }
+
+    /* The auto margin moves from `.nav-toggle` to `.nav-theme` - whichever of
+       the two comes first has to be the one that absorbs the free space, or
+       the pair no longer sits flush right. */
+    .nav-theme {
+        order: 1;
+        margin-left: auto;
+        width: 44px; height: 44px;
+        color: var(--ink);
+    }
+    .nav-theme svg { width: 20px; height: 20px; }
+    .nav-toggle { order: 2; }
 
     /* The links become a panel under the bar. `display:none` rather than a
        height transition: a hidden panel must not be reachable by tab. */
@@ -754,7 +865,7 @@ body {
         inset: 0;
         z-index: 30;
         border: 0;
-        background: rgba(15, 23, 42, .38);
+        background: var(--scrim);
     }
 
     /* ---- sections ---- */

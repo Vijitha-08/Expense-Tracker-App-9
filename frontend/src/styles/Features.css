@@ -1,6 +1,6 @@
 .features-section {
     padding: 80px 8%;
-    background: #fff;
+    background: var(--surface);
     text-align: center;
 }
 
@@ -33,7 +33,7 @@
 }
 
 .feature-card {
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 30px 25px;

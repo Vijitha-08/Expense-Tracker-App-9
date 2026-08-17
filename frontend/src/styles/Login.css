@@ -13,7 +13,7 @@
     display: flex;
     flex-direction: column;
     background:
-        radial-gradient(1200px 600px at 85% -10%, #eceefe 0%, rgba(236, 238, 254, 0) 60%),
+        radial-gradient(1200px 600px at 85% -10%, var(--glow) 0%, transparent 60%),
         linear-gradient(180deg, var(--page) 0%, var(--page-alt) 100%);
     font-family: var(--font);
     color: var(--ink);
@@ -46,7 +46,7 @@
     height: 42px;
     border-radius: 12px;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     font-size: 20px;
     flex: none;
 }
@@ -63,6 +63,32 @@
     color: var(--muted);
     line-height: 1.3;
 }
+
+/* Sits beside "Back to Home" in the auth top bar. Same border, radius,
+   surface and shadow as `.auth-back` so the pair reads as one control group;
+   square and icon-only because it has no label to carry. */
+.auth-topbar-right { display: inline-flex; align-items: center; gap: 10px; }
+.auth-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* 40px, matching `.auth-back`'s measured height exactly - it is 11px of
+       padding either side of a 14px/18px line. At 44px the button became the
+       tallest thing in the bar and pushed it from 94px to 96px, which moved
+       every auth page down 2px. Measured, not guessed. */
+    width: 40px; height: 40px;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: color .15s ease, border-color .15s ease;
+}
+.auth-theme:hover { color: var(--accent); border-color: var(--accent-line); }
+.auth-theme svg { width: 18px; height: 18px; }
 
 .auth-back {
     display: inline-flex;
@@ -142,7 +168,7 @@
     padding: 14px 24px;
     margin-bottom: 12px;
     background: var(--surface);
-    border: 1px solid rgba(255, 255, 255, .9);
+    border: 1px solid var(--card-edge);
     border-radius: var(--r-pill);
     box-shadow: var(--shadow-sm);
     font-size: 15px;
@@ -256,7 +282,7 @@
     outline: none;
     border-color: var(--accent);
     background: var(--surface);
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, .12);
+    box-shadow: 0 0 0 4px var(--focus-ring);
 }
 .auth-input input:focus + svg,
 .auth-input:focus-within > svg:first-child { color: var(--accent); }
@@ -320,8 +346,8 @@
     margin-top: 6px;
     border: none;
     border-radius: var(--r-md);
-    background: var(--ink);
-    color: #fff;
+    background: var(--fill);
+    color: var(--on-fill);
     font-family: inherit;
     font-size: 15.5px;
     font-weight: 700;
@@ -329,7 +355,7 @@
     cursor: pointer;
     transition: background .15s ease, transform .12s ease;
 }
-.auth-submit:not(:disabled):hover { background: #1c2740; transform: translateY(-1px); }
+.auth-submit:not(:disabled):hover { background: var(--fill-hover); transform: translateY(-1px); }
 .auth-submit:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ---------- account type options ---------- */
@@ -349,7 +375,7 @@
 }
 .auth-option:hover {
     border-color: var(--accent);
-    background: #fbfbff;
+    background: var(--field-focus);
     transform: translateY(-1px);
 }
 .auth-option-icon {
@@ -403,7 +429,7 @@
     border-radius: var(--r-sm);
     font-size: 13.5px;
     line-height: 1.55;
-    color: #3730a3;
+    color: var(--accent-deep);
 }
 .auth-note svg { flex: none; margin-top: 2px; font-size: 15px; }
 
@@ -420,9 +446,9 @@
     line-height: 1.5;
 }
 .auth-alert svg { flex: none; margin-top: 2px; font-size: 15px; }
-.auth-alert--error { background: var(--bad-wash); color: var(--bad); border-color: #f6cdca; }
-.auth-alert--warn  { background: var(--warn-wash); color: var(--warn); border-color: #f5dcae; }
-.auth-alert--ok    { background: var(--ok-wash);  color: var(--ok);  border-color: #bfe6cf; }
+.auth-alert--error { background: var(--bad-wash); color: var(--bad); border-color: var(--bad-line); }
+.auth-alert--warn  { background: var(--warn-wash); color: var(--warn); border-color: var(--warn-line); }
+.auth-alert--ok    { background: var(--ok-wash);  color: var(--ok);  border-color: var(--ok-line); }
 
 /* ---------- forgot password ---------- */
 /* Sits on the same row as "Remember me", to the right. */
@@ -467,9 +493,9 @@
     font-weight: 800;
 }
 .auth-step--on { background: var(--accent-wash); color: var(--accent); }
-.auth-step--on span { background: var(--accent); color: #fff; }
+.auth-step--on span { background: var(--accent); color: var(--on-accent); }
 .auth-step--done { background: var(--ok-wash); color: var(--ok); }
-.auth-step--done span { background: var(--ok); color: #fff; }
+.auth-step--done span { background: var(--ok); color: var(--on-ok); }
 
 /* The code field: six digits, spaced out, so a mistyped digit is easy to spot. */
 .auth-code {
@@ -561,6 +587,7 @@
        of the screen spent on chrome. The name alone still identifies
        the page; the tagline is landing-page copy. */
     .auth-topbar { padding: 12px 16px; flex-wrap: nowrap; gap: 10px; }
+    .auth-theme { width: 44px; height: 44px; }
     .auth-brand-sub { display: none; }
     .auth-back {
         flex: none;

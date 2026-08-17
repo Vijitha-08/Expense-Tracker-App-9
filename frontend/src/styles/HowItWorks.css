@@ -4,10 +4,19 @@
     text-align: center;
 }
 
+/* This heading was #1e293b, which is NOT --ink (#0f172a) - it was a shade
+   lighter than the other five section headings on the page, all of which take
+   --ink from App.css. A pre-existing drift, and the only reason it was never
+   obvious is that the two are within a shade of each other on a light page.
+   It could not stay a literal: near-black on a dark page is illegible, and it
+   is the section title.
+   This is therefore the ONE deliberate light-mode pixel change in this work
+   besides the new toggle - the heading now matches its siblings. Verified as a
+   colour-only change: same size, weight and position. */
 .how-it-works-section h2 {
     font-size: 48px;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--ink);
     margin-bottom: 50px;
 }
 
@@ -20,7 +29,7 @@
 
 .step {
     width: 300px;
-    background: #ffffff;
+    background: var(--surface);
     padding: 30px 20px;
     border-radius: 15px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
@@ -38,7 +47,7 @@
 }
 
 .step p {
-    color: #555;
+    color: var(--muted);
     font-size: 16px;
     line-height: 1.6;
 }

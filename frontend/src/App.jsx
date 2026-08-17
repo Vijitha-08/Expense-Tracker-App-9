@@ -40,7 +40,11 @@ function App() {
           <Routes>
             {/* public */}
             <Route path="/" element={<Home />} />
-            <Route path="/features" element={<Features />} />
+            {/* Wrapped in `.site` like Home is: this route renders the
+                Features section on its own, outside Home's wrapper, so
+                without this it would be the one public page the dark theme
+                could not reach. */}
+            <Route path="/features" element={<div className="site"><Features /></div>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterChoice />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

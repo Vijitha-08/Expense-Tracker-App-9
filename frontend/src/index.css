@@ -66,6 +66,161 @@
   --shadow-lg: 0 18px 50px rgba(15, 23, 42, .10);
 
   --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* ---- shared values that used to be written as a literal hex in two or
+     three stylesheets each. Same reasoning as the semantic block above: the
+     same meaning must not render two ways depending on which file you are
+     looking at. ---------------------------------------------------------- */
+
+  /* The filled primary action - Get Started, the hero primary, the contact
+     and auth submit buttons. On the light site that fill is --ink with white
+     text, and its hover was written as a literal #1c2740 in four separate
+     places (three in App.css, one in Login.css).
+
+     It gets its own token rather than reusing --ink because on a dark page a
+     near-black button on a near-black surface is invisible; the dark block
+     inverts it to a light fill with dark text, which is the same "this is the
+     primary action" signal the other way up. */
+  --fill:        var(--ink);
+  --on-fill:     #ffffff;
+  --fill-hover:  #1c2740;
+
+  /* A label on a filled --accent or --ok surface. */
+  --on-accent:  #ffffff;
+  --on-ok:      #ffffff;
+
+  /* The hairline highlight on the auth card, and the tint an auth field takes
+     while focused. */
+  --card-edge:   rgba(255, 255, 255, .9);
+  --field-focus: #fbfbff;
+  /* One step deeper than --accent, for accent text on an accent wash. */
+  --accent-deep: #3730a3;
+
+  /* The indigo bloom behind the hero and the auth pages - #eceefe in App.css,
+     the same colour again in Login.css. */
+  --glow:       #eceefe;
+  /* The ring a focused input draws outside its border. */
+  --focus-ring: rgba(79, 70, 229, .12);
+
+  /* Semantic borders. --ok-line was #bfe6cf in BOTH Admin.css and Login.css,
+     which is the one case where the duplication had not yet drifted. */
+  --ok-line:    #bfe6cf;
+  --warn-line:  #f5dcae;
+  --bad-line:   #f6cdca;
+
+  /* The footer is the one region of the light site that is already dark, so it
+     carries its own scale rather than borrowing the page's. */
+  --footer:      var(--ink);
+  --footer-ink:  #cbd5e1;
+  --footer-head: #ffffff;
+  --footer-dim:  #94a3b8;
+  --footer-rule: #334155;
+  --footer-fill:    rgba(255, 255, 255, .12);
+  --footer-fill-hi: rgba(255, 255, 255, .22);
+
+  /* The dimmer behind an open mobile menu. */
+  --scrim: rgba(15, 23, 42, .38);
+  /* The drop shadow under the hero screenshot. Pure black at low alpha, which
+     is what the rule has always used - NOT the slate rgba(15,23,42,...) the
+     elevation tokens above use. Keeping it exact matters: the first attempt at
+     this token was written as rgba(0,23,42,.10) and the light-mode pixel diff
+     caught it as a changed hero. */
+  --img-shadow: rgba(0, 0, 0, .10);
+}
+
+/* ============================================================
+   DARK PALETTE - ONE DEFINITION
+   ============================================================
+   Declared here as `--dk-*` and deliberately NOT applied to anything by this
+   block. Nothing changes colour because of these lines alone.
+
+   The scoped blocks are what apply them:
+     Admin.css   `:root[data-theme="dark"] .adm`
+     App.css     `:root[data-theme="dark"] :is(.site, .auth)`
+
+   Why indirect rather than simply flipping the tokens above? Because the user
+   dashboard (`.dash`) is still light. Flipping `:root` would drag it dark with
+   no dark styling written for it, and no way to opt it out short of a second
+   block re-stating every light value.
+
+   Why here rather than as literal hex in each dark block? Because that is
+   exactly the mistake this file already documents: --ok was written twice and
+   drifted to two different greens. The admin panel shipped with these values
+   inline; they were hoisted here the moment a second surface needed them, so
+   the two halves cannot diverge.
+
+   Contrast, measured against the card surface #171d2c. The light palette above
+   is documented as a deliberately tight 5.0-6.3:1 band; this is the same
+   discipline, 7.04-7.43:1 (a 0.39 spread, tighter than light's 1.27):
+
+     accent  #9ba4ff   7.33:1     ok    #34c46f   7.43:1
+     warn    #d69e2e   7.04:1     bad   #ff8a8a   7.41:1
+
+   The light values could not be reused: #0c7a42 green measures 1.8:1 on this
+   surface and #b45309 amber 2.3:1 - both illegible - and the light washes are
+   near-white, so they would glow rather than tint.
+
+   Ink ranks, on the tightest surface (--dk-page-alt #252d42):
+     ink 11.62:1   ink-soft 8.46:1   muted 5.84:1   muted-soft 4.52:1
+   All four clear 4.5:1 on all four surfaces.
+   ============================================================ */
+:root[data-theme="dark"] {
+  /* surfaces, back to front. The inverse of light: there a card is white and
+     lifts off a grey page, here it lifts by getting lighter. Steps are only
+     ~1.05-1.13:1 apart on purpose - on a dark screen a bigger jump between a
+     page and its cards reads as glare rather than elevation, so the borders
+     do the separating and --dk-border is visible rather than a hairline. */
+  --dk-recess:      #0b0e16;   /* footer, admin sidebar - furthest back */
+  --dk-page:        #0f131e;
+  --dk-surface:     #171d2c;   /* cards and panels */
+  --dk-field:       #1d2434;   /* inputs, row hover, recessed strips */
+  --dk-page-alt:    #252d42;   /* neutral chip and track fills */
+  --dk-border:      #2b3348;
+  --dk-border-strong:#414a68;
+  --dk-raised:      #333d59;   /* a selected segment, which must sit ABOVE its track */
+
+  --dk-ink:         #e9ecf7;
+  --dk-ink-soft:    #c5cbde;
+  --dk-muted:       #a0a9c2;
+  --dk-muted-soft:  #8b94ab;
+
+  /* Accent lightens to clear the dark card, which means white can no longer
+     sit on top of it: #ffffff on #9ba4ff is 2.30:1. Anything filled with the
+     accent takes --dk-on-accent instead, at 8.08:1. */
+  --dk-accent:      #9ba4ff;
+  --dk-accent-hover:#b3bbff;
+  --dk-accent-wash: #1c2140;
+  --dk-accent-line: #333c66;
+  --dk-on-accent:   #0f131e;
+
+  --dk-ok:          #34c46f;
+  --dk-ok-wash:     #0e2a1b;
+  --dk-ok-line:     #1d4a33;
+  --dk-warn:        #d69e2e;
+  --dk-warn-wash:   #2c2211;
+  --dk-warn-line:   #4a3a17;
+  --dk-bad:         #ff8a8a;
+  --dk-bad-wash:    #331a1c;
+  --dk-bad-line:    #5b2b2e;
+
+  /* An --ink-filled button cannot stay near-black on a dark page or it
+     disappears. It becomes a light surface with dark text instead, which is
+     the same "this is the primary action" signal inverted. */
+  --dk-fill:        #cdd3f5;
+  --dk-on-fill:     #10141f;
+  --dk-fill-hover:  #e2e6ff;
+
+  /* The bloom behind the hero. A pale lilac would be a bright smear here. */
+  --dk-glow:        #1b1f3d;
+  --dk-focus-ring:  rgba(155, 164, 255, .20);
+  --dk-scrim:       rgba(3, 5, 10, .66);
+  --dk-img-shadow:  rgba(0, 0, 0, .45);
+
+  /* Light-mode shadows are near-black at low alpha, which does nothing over a
+     dark background - a card ends up with no edge at all. */
+  --dk-shadow-sm: 0 1px 2px rgba(0, 0, 0, .30);
+  --dk-shadow-md: 0 4px 16px rgba(0, 0, 0, .38);
+  --dk-shadow-lg: 0 18px 50px rgba(0, 0, 0, .50);
 }
 
 html {
