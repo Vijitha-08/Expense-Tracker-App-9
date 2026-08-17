@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
     FiTrendingUp, FiLogOut, FiGrid, FiUsers, FiBarChart2,
-    FiFileText, FiList, FiSettings, FiMenu, FiX,
+    FiFileText, FiList, FiSettings, FiMenu, FiX, FiSun, FiMoon,
 } from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
+import { useDisplay } from "../context/useDisplay";
 import "../styles/Admin.css";
 
 // Below 860px the sidebar collapses to a bar with a menu button - measured, it
@@ -42,8 +43,10 @@ const initials = (name) =>
 
 const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
     const { user, logout } = useAuth();
+    const { resolvedTheme, toggleTheme } = useDisplay();
     const navigate = useNavigate();
     const [navOpen, setNavOpen] = useState(false);
+    const dark = resolvedTheme === "dark";
 
     // Closed from the link's own onClick rather than an effect on the pathname:
     // setState inside an effect causes a second render pass, and the click is
@@ -133,6 +136,22 @@ const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
                             <b>{user?.name}</b>
                             <small>Administrator</small>
                         </span>
+                        {/* One click to flip, next to the signed-in name where
+                            this control usually lives. It writes an explicit
+                            "light" or "dark", so using it opts out of following
+                            the device - Settings > Display is where you get
+                            "System" back, and it says so in the tooltip. */}
+                        <button
+                            type="button"
+                            className="adm-theme-btn"
+                            onClick={toggleTheme}
+                            aria-label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
+                            title={dark
+                                ? "Switch to light (Settings › Display to follow your device)"
+                                : "Switch to dark (Settings › Display to follow your device)"}
+                        >
+                            {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
+                        </button>
                     </div>
                     <button type="button" className="adm-logout" onClick={handleLogout}>
                         <FiLogOut aria-hidden="true" /> Log out

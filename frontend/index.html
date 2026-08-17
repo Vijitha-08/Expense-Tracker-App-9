@@ -8,6 +8,29 @@
       <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      /* Sets data-theme before the first paint. Without this, a hard reload of
+         an admin page in dark mode flashes the light panel for however long it
+         takes React to mount and the DisplayProvider effect to run - on a cold
+         cache that is long enough to be unpleasant.
+
+         Deliberately inline and blocking: an external file would be another
+         round trip, which is the whole problem. It reads the same localStorage
+         key and the same "system" fallback as DisplayContext.jsx, so the two
+         cannot disagree; if this script is ever removed the app still works,
+         it just flashes. */
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem("expense-tracker-display") || "{}");
+          var choice = saved.theme || "system";
+          var dark = choice === "dark" || (choice === "system" &&
+            window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

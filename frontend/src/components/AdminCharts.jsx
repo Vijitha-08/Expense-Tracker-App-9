@@ -41,7 +41,24 @@ export const MonthBars = ({ months = [], format, tall = false, emptyText = "No s
 // mutated inside the map: reassigning a variable during render is exactly
 // what the React compiler rejects.
 // ---------------------------------------------------------------
-const SHADES = ["#4f46e5", "#7c8cf8", "#a5b0fb", "#c3c9fb", "#e2e6fd"];
+// Custom-property references rather than hex, so the ramp follows the theme.
+// As literal hex this array was the one part of the admin palette that could
+// not react to anything: the light ramp runs dark indigo -> near-white, and on
+// a dark card its first slice measured 2.7:1 while its last one glared. The
+// values now live beside every other admin colour in Admin.css, which is also
+// the only place the dark override needs to touch.
+//
+// These must be applied through `style`, never as an SVG presentation
+// attribute - `stroke="var(--x)"` is not resolved by the SVG attribute parser,
+// it only works in CSS. That is why the circles below set `style={{ stroke }}`
+// and not `stroke={...}`.
+const SHADES = [
+    "var(--a-chart-1)",
+    "var(--a-chart-2)",
+    "var(--a-chart-3)",
+    "var(--a-chart-4)",
+    "var(--a-chart-5)",
+];
 
 export const CategoryDonut = ({ categories = [], format, title, centreLabel = "Total" }) => {
     const total = categories.reduce((sum, c) => sum + Number(c.total), 0);
@@ -73,12 +90,14 @@ export const CategoryDonut = ({ categories = [], format, title, centreLabel = "T
                 <div className="adm-donut">
                     <svg width="140" height="140" viewBox="0 0 42 42" role="img"
                          aria-label={`Spending split across ${top.length} categories`}>
-                        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#eef0fa" strokeWidth="6" />
+                        <circle cx="21" cy="21" r="15.9" fill="none" strokeWidth="6"
+                                style={{ stroke: "var(--a-chart-track)" }} />
                         {arcs.map((a, i) => (
                             <circle
                                 key={top[i].category}
                                 cx="21" cy="21" r="15.9" fill="none"
-                                stroke={a.colour} strokeWidth="6"
+                                strokeWidth="6"
+                                style={{ stroke: a.colour }}
                                 strokeDasharray={`${a.dash} ${100 - a.dash}`}
                                 strokeDashoffset={a.offset}
                             />

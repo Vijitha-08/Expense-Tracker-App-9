@@ -22,6 +22,13 @@ import * as profile from "../services/profileService";
 // rather than ship quietly.
 const SAMPLE = 11054890;
 
+// "System" first, because it is the default and the one that needs no decision.
+const THEMES = [
+    { id: "system", label: "System" },
+    { id: "light",  label: "Light" },
+    { id: "dark",   label: "Dark" },
+];
+
 const AdminSettings = () => {
     const { user, refresh } = useAuth();
     const display = useDisplay();
@@ -204,6 +211,30 @@ const AdminSettings = () => {
                     <div className="adm-panel-head">
                         <h3>Display</h3>
                         <span className="adm-hint">Saved in this browser</span>
+                    </div>
+
+                    {/* Theme sits first: it is the preference someone opens this
+                        tab looking for, and the only one that changes the page
+                        while they are still on it. */}
+                    <div className="adm-set-row">
+                        <span className="adm-set-txt">
+                            <b>Theme</b>
+                            <small>
+                                {display.theme === "system"
+                                    ? `Following this device, which is currently ${display.resolvedTheme}.`
+                                    : "Applies to the admin panel only."}
+                            </small>
+                        </span>
+                        <span className="adm-pick" role="group" aria-label="Theme">
+                            {THEMES.map(({ id, label }) => (
+                                <button key={id} type="button"
+                                        aria-pressed={display.theme === id}
+                                        className={display.theme === id ? "adm-pick-on" : ""}
+                                        onClick={() => display.set({ theme: id })}>
+                                    {label}
+                                </button>
+                            ))}
+                        </span>
                     </div>
 
                     <div className="adm-set-row">
