@@ -1,6 +1,31 @@
 import { useState } from "react";
 import { FiAlertCircle } from "react-icons/fi";
 
+// A fixed list with an Others escape hatch, replacing what used to be a bare
+// text input. The old comment said free text was deliberate - "the category is
+// whatever the user types" - and the data shows what that cost: the same
+// database now holds "travel" AND "Travel" as two separate categories, plus
+// "Accomodation" misspelled, so they report as different things and the totals
+// split across them.
+//
+// The list stops NEW drift. Others keeps the field open for anything the list
+// does not cover, and is also the fallback for an EXISTING row whose category
+// is not on the list - so opening an old expense to edit it shows its real
+// value in the text box rather than silently rewriting it to something else.
+const CATEGORIES = [
+    "Accommodation",
+    "Utilities",
+    "Groceries",
+    "Travel",
+    "Party",
+    "Loan & EMI",
+];
+
+// A sentinel, not a real category: it must never be submitted. The double
+// underscores make that obvious at a glance and cannot collide with a category
+// someone actually types.
+const OTHER = "__other__";
+
 const today = () => {
     // Local date, not toISOString(): in IST the UTC date is still yesterday
     // for the first 5.5 hours of every day, which would put a fresh expense
@@ -29,11 +54,32 @@ const ExpenseForm = ({
             }
             : { title: "", amount: "", category: "", expenseDate: today(), description: "" }
     );
+    // Which row of the dropdown is showing. Held separately from
+    // `form.category` because two different states map to the same stored
+    // value: "Others is selected and the box is still empty" and "nothing is
+    // selected yet" would otherwise be indistinguishable.
+    const [catChoice, setCatChoice] = useState(() => {
+        const c = editing?.category || "";
+        if (!c) return "";
+        return CATEGORIES.includes(c) ? c : OTHER;
+    });
+
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
 
     const handleChange = (e) => {
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+        setError("");
+    };
+
+    const handleCategoryChoice = (e) => {
+        const value = e.target.value;
+        setCatChoice(value);
+        // Choosing Others CLEARS the stored value so the text box starts empty,
+        // rather than carrying the previous selection in as a default the user
+        // never typed. Note this only runs on a real change event, so an
+        // existing row that opens on Others keeps its value.
+        setForm((prev) => ({ ...prev, category: value === OTHER ? "" : value }));
         setError("");
     };
 
@@ -50,6 +96,7 @@ const ExpenseForm = ({
                     title: "", amount: "", category: "",
                     expenseDate: today(), description: "",
                 });
+                setCatChoice("");
             }
         } catch (err) {
             setError(err.message);
@@ -89,11 +136,35 @@ const ExpenseForm = ({
             <div className="form-row">
                 <label>
                     Category
-                    {/* Free text on purpose - the category is whatever the user
-                        types (Food, Rent, OTT...), not a fixed list. maxLength
-                        mirrors the VARCHAR(50) column so nothing is silently cut. */}
-                    <input name="category" value={form.category} onChange={handleChange}
-                           placeholder="e.g. Food, Rent, Travel" maxLength={50} />
+                    <select
+                        name="categoryChoice"
+                        value={catChoice}
+                        onChange={handleCategoryChoice}
+                    >
+                        <option value="">Select a category</option>
+                        {CATEGORIES.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                        ))}
+                        <option value={OTHER}>Others</option>
+                    </select>
+
+                    {/* Rendered inside the same <label> rather than as a sibling:
+                        `.form-row` is a two-column grid, so a third child would
+                        push Date onto its own row. `.dash label` already stacks
+                        its contents, so the box simply appears under the
+                        dropdown. maxLength mirrors the VARCHAR(50) column so
+                        nothing is silently cut on the way to the database. */}
+                    {catChoice === OTHER && (
+                        <input
+                            name="category"
+                            value={form.category}
+                            onChange={handleChange}
+                            placeholder="Type a category"
+                            maxLength={50}
+                            aria-label="Custom category"
+                            autoFocus
+                        />
+                    )}
                 </label>
                 <label>
                     Date

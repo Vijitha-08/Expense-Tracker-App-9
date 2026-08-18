@@ -474,11 +474,28 @@
     font-size: 12.5px; font-weight: 650; color: var(--a-muted);
 }
 .adm-drop svg { width: 15px; height: 15px; color: var(--a-muted); flex: none; }
+/* `background` is an explicit colour, NOT `transparent`.
+   The closed control looks identical either way, because the value here matches
+   the wrapper's own --a-surface. The difference is the OPEN dropdown: Chrome
+   paints the native option list from the <select>'s own computed
+   background-color, and for a transparent one it falls back to the platform
+   default - which on Windows is white. So in dark mode the control was correct
+   and the list that dropped out of it was a white panel with near-white text
+   in it, i.e. unreadable.
+   `color-scheme: dark` alone does not fix this; it was already inheriting
+   correctly from `.adm` and the popup was still white. The option colours below
+   are set for the same reason - some platforms read those rather than the
+   select's. */
 .adm-drop select,
 .adm-select select {
     font: inherit; font-size: 13.5px; font-weight: 700; color: var(--a-ink);
-    border: 0; background: transparent; padding: 2px 2px 2px 0;
+    border: 0; background: var(--a-surface); padding: 2px 2px 2px 0;
     cursor: pointer; max-width: 190px;
+}
+.adm-drop select option,
+.adm-select select option {
+    background: var(--a-surface);
+    color: var(--a-ink);
 }
 .adm-drop select:focus-visible,
 .adm-select select:focus-visible { outline: 2px solid var(--a-accent); border-radius: 4px; }
@@ -636,6 +653,10 @@
 .adm-col-num   { width: 110px; }
 .adm-col-money { width: 148px; }
 .adm-col-share { width: 190px; }
+/* The name column is deliberately left AUTO here so that on a wide screen it
+   takes whatever is left over (about 500px at 1440px). It only needs a declared
+   width once the declared widths stop fitting - see the note in the 1180px
+   block, which is where this column was collapsing to zero. */
 
 /* The name, with its supporting detail on a second line. This is where the
    columns that used to sit in the middle of the row now live. */
@@ -982,6 +1003,24 @@
        headings stay where they are and only the table moves. Without this the
        page itself scrolled to 843px inside a 420px window. */
     .adm-panel { overflow-x: auto; }
+
+    /* ---- the name column must not collapse to zero -------------------------
+       `.adm-table-fixed` is `table-layout: fixed`, and the Reports tables
+       declare 110 + 148 + 148 + 190 = 596px across their numeric columns while
+       leaving the first `<col />` with no width at all. On a wide screen that is
+       fine: the table is ~1100px and the name column absorbs the ~500px left
+       over. Once the panel is narrower than 596px there is nothing left over,
+       so the first column computed to EXACTLY 0px and the heading rendered on
+       top of the next one - "PERSON" and "EXPENSES" overlapping as
+       "PERSOEXPENSES", with the names doing the same over the figures.
+
+       Measured at 390px before this rule: th "Person" width 0, content 61px.
+       Declaring a width gives the column somewhere to be and the panel scrolls
+       sideways instead, which is what the note above already intends.
+
+       This is a pre-existing bug in the fixed-layout column set, not something
+       the theme introduced - it is only visible on a narrow screen. */
+    .adm-table-fixed > colgroup > col:first-child { width: 168px; }
 
     .adm-grid-3,
     .adm-grid-4,

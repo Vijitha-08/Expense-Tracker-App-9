@@ -700,6 +700,15 @@
     color: var(--ink);
     width: 100%;
 }
+/* Explicit, for the same reason as `.adm-drop select option`: the native option
+   list does not reliably inherit the control's colours, and a white popup over a
+   dark form is unreadable. The select itself already carries a real background
+   above, so only the list needed stating. */
+.dash select option {
+    background: var(--surface);
+    color: var(--ink);
+}
+
 .dash textarea { resize: vertical; }
 .dash input:focus, .dash select:focus, .dash textarea:focus {
     outline: none;
