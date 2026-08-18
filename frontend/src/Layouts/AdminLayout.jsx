@@ -151,6 +151,15 @@ const AdminLayout = ({ title, subtitle, actions, children, counts = {} }) => {
                                 : "Switch to dark (Settings › Display to follow your device)"}
                         >
                             {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
+                            {/* Revealed only inside the mobile drawer, where
+                                there is room for a word. One element with a
+                                hidden label beats a second icon-only button
+                                that exists purely for the other breakpoint -
+                                two buttons for one action is two things to keep
+                                in sync, and both would be in the tab order. */}
+                            <span className="adm-theme-label">
+                                {dark ? "Light theme" : "Dark theme"}
+                            </span>
                         </button>
                     </div>
                     <button type="button" className="adm-logout" onClick={handleLogout}>

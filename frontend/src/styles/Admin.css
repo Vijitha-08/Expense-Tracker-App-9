@@ -65,7 +65,13 @@
     --a-side-ink:     #ffffff;
     --a-side-link:    #b9c0dd;
     --a-side-dim:     #8e97bd;
-    --a-side-label:   #6e77a0;
+    /* Was #6e77a0, which measures 3.93:1 on the navy - a real AA miss on the
+       OVERVIEW and SYSTEM group labels, found by auditing the open drawer and
+       true of the desktop sidebar too. Same hue and chroma, lightness lifted
+       0.05 in OKLCH, so it clears 4.83:1 and now matches the dark side's 4.82:1
+       rather than being the one value that was never brought up. This is the
+       ONLY change this round that is visible above the mobile breakpoint. */
+    --a-side-label:   #7d86b0;   /* 4.83:1 on the sidebar */
     --a-side-logout:  #dfe3f5;
     --a-side-fill:    rgba(255, 255, 255, .07);
     --a-side-fill-hi: rgba(255, 255, 255, .12);
@@ -397,7 +403,7 @@
 .adm-nav-on .adm-count { background: var(--a-side-fill-on); }
 
 .adm-side-foot { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--a-side-line); }
-.adm-me { display: flex; align-items: center; gap: 10px; padding: 12px 6px; }
+.adm-me { display: flex; align-items: center; gap: 10px; padding: 12px 6px; flex-wrap: wrap; }
 .adm-me-text b { display: block; font-size: 13px; font-weight: 750; line-height: 1.3; }
 .adm-me-text small { display: block; font-size: 11.5px; color: var(--a-side-dim); font-weight: 600; }
 .adm-avatar {
@@ -405,18 +411,22 @@
     background: var(--a-accent); color: var(--a-on-accent);
     display: grid; place-items: center; font-weight: 800; font-size: 13px; flex: none;
 }
-/* `margin-left: auto` rather than `flex: 1` on the text beside it: the name and
-   role block should keep its natural width so a long name still wraps against
-   the sidebar edge rather than against this button. */
+/* A labelled row on its own line, at every width - it was a 32px icon square
+   tucked beside the name, which is a lot of guessing for the one control that
+   changes how the whole panel looks. `flex: 0 0 100%` rather than `width: 100%`
+   alone: a flex item can still be shrunk onto the previous line by its own
+   `flex-shrink`, and the wrap has to be guaranteed, not likely. */
 .adm-theme-btn {
-    margin-left: auto;
-    display: grid; place-items: center;
-    width: 32px; height: 32px; flex: none;
-    border-radius: 10px;
+    flex: 0 0 100%;
+    margin-top: 10px;
+    display: flex; align-items: center; justify-content: flex-start; gap: 9px;
+    height: 40px; padding: 0 11px;
+    border-radius: 11px;
     border: 1px solid var(--a-side-line);
     background: var(--a-side-fill);
     color: var(--a-side-link);
-    cursor: pointer; padding: 0;
+    font: inherit; font-size: 13px; font-weight: 700;
+    cursor: pointer;
 }
 .adm-theme-btn:hover { background: var(--a-side-fill-hi); color: var(--a-side-ink); }
 .adm-theme-btn svg { width: 16px; height: 16px; }
@@ -1041,7 +1051,10 @@
         position: static; height: auto; overflow-y: visible;
     }
     .adm-nav { flex-direction: row; flex-wrap: wrap; }
-    .adm-side-foot { margin-top: 16px; }
+    /* No `margin-top` override here any more. It was 16px, from when the panel
+       expanded the bar downwards in normal flow; in a full-height drawer it beat
+       the base `margin-top: auto` and left Log out 241px short of the bottom
+       edge at 390px. Measured, not spotted by eye. */
     .adm-main { padding: 22px 18px 34px; }
     .adm-grid-3,
     .adm-grid-4,
@@ -1186,12 +1199,18 @@
        file), so on a large screen the brand, nav and footer stay direct
        flex children of `.adm-side` and nothing about the desktop
        sidebar changes. Here they become real boxes. */
+    /* The drawer and the scrim start exactly below the bar. Declaring the bar's
+       height as a token is what makes that possible without measuring the bar
+       in JS: 10 + 44 + 10. `.dash` carries the same token at its own
+       breakpoint, so the two shells offset their drawers identically. */
+    .adm { --adm-bar-h: 64px; }
+
     .adm-side {
         padding: 10px 14px;
         position: sticky;          /* was `static` - the bar now stays reachable */
         top: 0;
         z-index: 40;
-        height: auto;
+        height: var(--adm-bar-h);  /* was `auto`, when the panel expanded in flow */
         overflow: visible;
     }
 
@@ -1231,19 +1250,40 @@
     .adm-nav-toggle svg { width: 21px; height: 21px; }
     .adm-nav-toggle:active { background: var(--a-side-fill-hi); }
 
-    /* `display: none` rather than height/opacity: a closed panel must
-       not be reachable by Tab, and a 0-height panel still is. */
-    .adm-side-panel {
-        display: none;
-        flex-direction: column;
-        margin-top: 12px;
-        padding-top: 10px;
-        border-top: 1px solid var(--a-side-line);
-    }
-    .adm-side--open .adm-side-panel { display: flex; }
+    /* A left drawer, not a block that expands the bar downwards. The panel used
+       to push the page down and the scrim covered whatever was left, which put
+       Log out wherever the nav list happened to end - on a short phone that was
+       below the fold. Anchored to the viewport instead, it is always full
+       height, so Log out is always at the bottom edge.
 
-    /* `margin-top: auto` only makes sense in a full-height column. */
-    .adm-side-panel .adm-side-foot { margin-top: 12px; }
+       `visibility: hidden` rather than `display: none`: it can be transitioned,
+       so the drawer slides, and unlike opacity alone it also takes the closed
+       drawer out of the tab order - a menu you cannot see but can still Tab
+       into is worse than one that does not animate. */
+    .adm-side-panel {
+        position: fixed;
+        top: var(--adm-bar-h);
+        left: 0;
+        bottom: 0;
+        width: min(300px, 84vw);
+        z-index: 45;
+        display: flex;
+        flex-direction: column;
+        padding: 14px 14px 16px;
+        background: var(--a-side);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, .28);
+        overflow-y: auto;
+        visibility: hidden;
+        transform: translateX(-100%);
+        transition: transform .22s ease, visibility .22s linear;
+    }
+    .adm-side--open .adm-side-panel {
+        visibility: visible;
+        transform: translateX(0);
+    }
+
+    /* The mobile override that used to force a 12px gap is gone: in a
+       full-height drawer the base `margin-top: auto` does the pinning. */
 
     /* One link per row. This was two columns, on the reasoning that "the
        whole open panel then fits a phone screen without scrolling" - so
@@ -1264,12 +1304,20 @@
     }
     .adm-side-panel .adm-nav-link { padding: 12px; }
 
+    /* The row styling now lives in the base rule; the drawer only widens the
+       padding to match its own gutters. */
+    .adm-side-panel .adm-me { padding: 12px 4px; }
+
     /* Sibling of the aside, not a child: as a child it would sit inside
        the sidebar's own stacking context and paint over the navy bar it
-       is meant to sit behind. 30 is below the bar's 40. */
+       is meant to sit behind. 30 is below the bar's 40, and it starts below
+       the bar so the menu button stays tappable while the drawer is open. */
     .adm-scrim {
         position: fixed;
-        inset: 0;
+        top: var(--adm-bar-h);
+        left: 0;
+        right: 0;
+        bottom: 0;
         z-index: 30;
         border: 0;
         padding: 0;
@@ -1286,6 +1334,10 @@
     .adm-side-panel { display: contents; }
     .adm-nav-toggle { display: none; }
     .adm-scrim { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .adm-side-panel { transition: none; }
 }
 
 /* ============================================================
@@ -1319,11 +1371,13 @@
     .adm-btn,
     .adm-tab,
     .adm-select,
+    .adm-logout,
     .adm-drop { min-height: 44px; }
 
-    /* Same 44px floor the nav toggle already gets - a 32px square is fine
-       under a mouse and not under a thumb. */
-    .adm-theme-btn { width: 44px; height: 44px; }
+    /* Same 44px floor the nav toggle already gets - 40px is fine under a mouse
+       and not under a thumb. Height only: the control is a full-width row now,
+       so setting a width here would collapse it back to a square. */
+    .adm-theme-btn { height: 44px; }
     .adm-theme-btn svg { width: 19px; height: 19px; }
 
     /* The wrapper is what you actually tap on the pickers - the

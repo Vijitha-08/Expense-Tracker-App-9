@@ -950,3 +950,172 @@
     .dash select,
     .dash .select-inline select { min-height: 44px; }
 }
+
+/* ============================================================
+   MOBILE: THE BAR'S CONTROLS MOVE INTO A DRAWER
+   ------------------------------------------------------------
+   Measured before: at 390px the top bar wrapped to two rows and
+   stood 123px tall, with the role chip, the theme button and Log
+   out sharing one 390px row. The bar is now a 64px row holding a
+   brand and a menu button, and those three controls live in a
+   left drawer with Log out pinned to its bottom edge.
+
+   `.dash-bar-top` and `.dash-side-panel` are `display: contents`
+   above 720px (block at the end of this file), so on a wide
+   screen the brand and `.dash-user` are still direct flex
+   children of `.dash-topbar` and the desktop bar is unchanged.
+   Same trick the admin sidebar uses, for the same reason.
+   ============================================================ */
+@media (max-width: 720px) {
+    /* The drawer and the scrim start exactly below the bar. Declaring the
+       bar's height as a token is what makes that possible without measuring
+       the bar in JS: 10 + 44 + 10. */
+    .dash { --dash-bar-h: 64px; }
+
+    .dash .dash-topbar {
+        height: var(--dash-bar-h);
+        padding: 10px clamp(14px, 4vw, 40px);
+        /* Was `wrap`, for the two-row bar this replaces. */
+        flex-wrap: nowrap;
+        /* The blur has to go at this width, and not for taste: `backdrop-filter`
+           makes an element the containing block for its `position: fixed`
+           descendants, so the drawer's `top`/`bottom` resolved against this
+           64px bar instead of the viewport and it rendered 36px tall with 207px
+           of content inside it. An opaque bar also drops a per-frame blur on
+           scroll, which a phone notices. */
+        backdrop-filter: none;
+        background: var(--surface);
+    }
+
+    .dash .dash-bar-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+    }
+
+    /* The menu button sits at the LEFT edge, before the brand. It is second in
+       the DOM, so `order` moves it visually without touching the markup - and
+       the auto margin has to move to whichever element then comes first, or
+       the row stops sitting flush. Exactly the fix the admin bar needed. */
+    .dash .dash-nav-toggle { order: -1; }
+    .dash .dash-bar-top .dash-brand { margin-right: auto; }
+
+    .dash .dash-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* 44px: the smallest target most thumbs hit reliably. */
+        width: 44px; height: 44px;
+        flex: none;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        background: var(--surface);
+        color: var(--ink-soft);
+        cursor: pointer;
+    }
+    .dash .dash-nav-toggle svg { width: 21px; height: 21px; }
+    .dash .dash-nav-toggle:active { background: var(--page-alt); }
+
+    /* `visibility: hidden` rather than `display: none`: it can be transitioned,
+       so the drawer slides, and unlike opacity alone it also takes the closed
+       drawer out of the tab order - a menu you cannot see but can still Tab
+       into is worse than one that does not animate. */
+    .dash .dash-side-panel {
+        position: fixed;
+        top: var(--dash-bar-h);
+        left: 0;
+        bottom: 0;
+        width: min(300px, 84vw);
+        z-index: 45;
+        display: flex;
+        flex-direction: column;
+        padding: 18px 16px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        box-shadow: 10px 0 30px var(--img-shadow);
+        overflow-y: auto;
+        visibility: hidden;
+        transform: translateX(-100%);
+        transition: transform .22s ease, visibility .22s linear;
+    }
+    .dash .dash-side-panel--open {
+        visibility: visible;
+        transform: translateX(0);
+    }
+
+    .dash .dash-side-panel .dash-user {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        flex: 1;
+    }
+
+    /* The name reads in full in here. It is hidden in the bar at this width
+       only because the bar had no room for it - the drawer does. */
+    .dash .dash-side-panel .dash-user-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--border);
+    }
+    .dash .dash-side-panel .dash-user-meta strong {
+        display: block;
+        font-size: 15px;
+    }
+
+    /* An icon-plus-label row, not a 38px square: the square exists because the
+       desktop bar has no room for a word, and a drawer does. */
+    .dash .dash-side-panel .dash-theme {
+        width: 100%;
+        height: 44px;
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 0 12px;
+        font: inherit;
+        font-size: 13.5px;
+        font-weight: 650;
+        color: var(--ink-soft);
+    }
+    .dash .dash-theme-label { display: inline; }
+
+    /* Pinned to the bottom edge, the way the reference does it. `.dash-logout`
+       was already a selector in this file with nothing rendering it - it now
+       has a real target, and picks up the 44px tap minimum below 900px. */
+    .dash .dash-side-panel .dash-logout {
+        margin-top: auto;
+        width: 100%;
+        height: 44px;
+        justify-content: center;
+    }
+
+    .dash .dash-scrim {
+        position: fixed;
+        top: var(--dash-bar-h);
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        border: 0;
+        padding: 0;
+        background: var(--scrim);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dash .dash-side-panel { transition: none; }
+}
+
+/* Above the breakpoint the two wrappers must not exist as boxes, or
+   `.dash-topbar` becomes a two-item row and the bar's `space-between` puts the
+   brand and the whole user group in the wrong places. `display: contents`
+   removes the box and promotes the children to flex items again. */
+@media (min-width: 721px) {
+    .dash .dash-bar-top,
+    .dash .dash-side-panel { display: contents; }
+    .dash .dash-nav-toggle,
+    .dash .dash-theme-label,
+    .dash .dash-scrim { display: none; }
+}

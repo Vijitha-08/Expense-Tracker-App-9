@@ -1,5 +1,8 @@
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FiTrendingUp, FiLogOut, FiShield, FiUser, FiSun, FiMoon } from "react-icons/fi";
+import {
+    FiTrendingUp, FiLogOut, FiShield, FiUser, FiSun, FiMoon, FiMenu, FiX,
+} from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
 import { useDisplay } from "../context/useDisplay";
 import "../styles/Dashboard.css";
@@ -8,6 +11,11 @@ const ROLE_LOOK = {
     admin: { label: "Administrator", Icon: FiShield },
     user:  { label: "User",          Icon: FiUser },
 };
+
+// Matches the existing 720px mobile block in Dashboard.css rather than the
+// admin's 860px: this bar only ever holds a brand and two controls, so it has
+// no reason to collapse as early as a 250px sidebar does.
+const NAV_BREAKPOINT = 720;
 
 // Shared chrome for both dashboards: brand bar, who is signed in, log out, and
 // an optional row of section tabs. The admin passes tabs; the user does not,
@@ -22,9 +30,30 @@ const DashboardLayout = ({
     const { resolvedTheme, toggleTheme } = useDisplay();
     const dark = resolvedTheme === "dark";
     const navigate = useNavigate();
+    const [navOpen, setNavOpen] = useState(false);
 
     const role = ROLE_LOOK[user?.role] || { label: user?.role, Icon: FiUser };
     const RoleIcon = role.Icon;
+
+    const closeNav = () => setNavOpen(false);
+
+    // A phone rotated to landscape can cross the breakpoint with the drawer
+    // open, stranding it over the desktop bar. Same guard as AdminLayout.
+    useEffect(() => {
+        const onResize = () => {
+            if (window.innerWidth > NAV_BREAKPOINT) setNavOpen(false);
+        };
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    // Stop the page scrolling behind the open drawer.
+    useEffect(() => {
+        if (!navOpen) return;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = previous; };
+    }, [navOpen]);
 
     const handleLogout = () => {
         logout();
@@ -34,32 +63,76 @@ const DashboardLayout = ({
     return (
         <div className={`dash dash-${user?.role || "user"}`}>
             <header className="dash-topbar">
-                <Link to="/" className="dash-brand">
-                    <span className="dash-brand-mark" aria-hidden="true"><FiTrendingUp /></span>
-                    <span className="dash-brand-name">EXPENSE TRACKER</span>
-                </Link>
+                {/* `.dash-bar-top` and `.dash-side-panel` are `display: contents`
+                    above 720px, so on a wide screen the brand and `.dash-user`
+                    stay direct flex children of `.dash-topbar` exactly as
+                    before and nothing about the desktop bar changes. Below it
+                    they become real boxes: a bar, and a drawer beneath it. */}
+                <div className="dash-bar-top">
+                    <Link to="/" className="dash-brand" onClick={closeNav}>
+                        <span className="dash-brand-mark" aria-hidden="true"><FiTrendingUp /></span>
+                        <span className="dash-brand-name">EXPENSE TRACKER</span>
+                    </Link>
 
-                <div className="dash-user">
-                    <span className="dash-user-meta">
-                        <strong>{user?.name}</strong>
-                        <span className={`role-chip role-${user?.role}`}>
-                            <RoleIcon aria-hidden="true" /> {role.label}
-                        </span>
-                    </span>
                     <button
                         type="button"
-                        className="dash-theme"
-                        onClick={toggleTheme}
-                        aria-label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
-                        title={dark ? "Switch to light" : "Switch to dark"}
+                        className="dash-nav-toggle"
+                        aria-label={navOpen ? "Close menu" : "Open menu"}
+                        aria-expanded={navOpen}
+                        aria-controls="dash-side-panel"
+                        onClick={() => setNavOpen((v) => !v)}
                     >
-                        {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
-                    </button>
-                    <button className="btn btn-ghost" onClick={handleLogout}>
-                        <FiLogOut aria-hidden="true" /> Log out
+                        {navOpen ? <FiX aria-hidden="true" /> : <FiMenu aria-hidden="true" />}
                     </button>
                 </div>
+
+                <div
+                    className={`dash-side-panel${navOpen ? " dash-side-panel--open" : ""}`}
+                    id="dash-side-panel"
+                >
+                    <div className="dash-user">
+                        <span className="dash-user-meta">
+                            <strong>{user?.name}</strong>
+                            <span className={`role-chip role-${user?.role}`}>
+                                <RoleIcon aria-hidden="true" /> {role.label}
+                            </span>
+                        </span>
+                        <button
+                            type="button"
+                            className="dash-theme"
+                            onClick={toggleTheme}
+                            aria-label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
+                            title={dark ? "Switch to light" : "Switch to dark"}
+                        >
+                            {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
+                            {/* Revealed only inside the drawer. One element with a
+                                hidden label beats a second icon-only button that
+                                exists purely for the other breakpoint - two
+                                buttons for one action is two things to keep in
+                                sync, and both would be in the tab order. */}
+                            <span className="dash-theme-label">
+                                {dark ? "Light theme" : "Dark theme"}
+                            </span>
+                        </button>
+                        <button className="btn btn-ghost dash-logout" onClick={handleLogout}>
+                            <FiLogOut aria-hidden="true" /> Log out
+                        </button>
+                    </div>
+                </div>
             </header>
+
+            {/* Sibling of the header, not a child: inside it the scrim would join
+                the sticky bar's stacking context and paint over the bar it is
+                meant to sit behind. Tapping it closes the drawer, so the menu
+                can never trap you. */}
+            {navOpen && (
+                <button
+                    type="button"
+                    className="dash-scrim"
+                    aria-label="Close menu"
+                    onClick={closeNav}
+                />
+            )}
 
             <div className="dash-heading">
                 <div>
