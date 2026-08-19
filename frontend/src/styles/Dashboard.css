@@ -1032,6 +1032,12 @@
         display: flex;
         flex-direction: column;
         padding: 18px 16px;
+        /* Same plane as the bar above it, so the drawer reads as one continuous
+           panel - the way the admin sidebar does. It was briefly `var(--page)`,
+           which is darker than the bar and made the whole drawer look dimmed,
+           as though the scrim were covering it. The scrim never touches it (the
+           drawer is z-index 45, the scrim 30); it was just the wrong token.
+           The controls below lift OFF this plane instead. */
         background: var(--surface);
         border-right: 1px solid var(--border);
         box-shadow: 10px 0 30px var(--img-shadow);
@@ -1059,7 +1065,7 @@
         align-items: flex-start;
         gap: 8px;
         padding-bottom: 14px;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--border-strong);
     }
     .dash .dash-side-panel .dash-user-meta strong {
         display: block;
@@ -1078,6 +1084,20 @@
         font-size: 13.5px;
         font-weight: 650;
         color: var(--ink-soft);
+        /* RAISED off the panel, not level with it. Both controls used to be
+           `var(--surface)` - the same token as the panel - so in dark mode all
+           three were #171d2c and the two buttons were invisible, separated only
+           by a 1.34:1 hairline. `--page-alt` is the palette's raised plane, and
+           it lifts in both themes; the stronger rule and the card shadow carry
+           the rest, because on this palette a fill step alone never does. */
+        background: var(--page-alt);
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-sm);
+    }
+    .dash .dash-side-panel .dash-logout {
+        background: var(--page-alt);
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-sm);
     }
     .dash .dash-theme-label { display: inline; }
 
@@ -1091,13 +1111,22 @@
         justify-content: center;
     }
 
+    /* z-index 10, and the number matters. `.dash-topbar` is `position: sticky`
+       with `z-index: 20`, which makes it a STACKING CONTEXT - so the drawer's
+       own `z-index: 45` only ranks it inside the header, not against this
+       scrim. At 30 the scrim outranked the header's 20 and painted over the
+       whole header subtree, drawer included: measured, the drawer rendered
+       #090c16 instead of #171d2c, which is exactly #171d2c under a 66% black
+       veil. That is why the drawer looked dimmed. Below 20 it covers the page
+       (nothing there is above z-index 0) and never touches the drawer.
+       The admin gets this right by accident - its bar is 40, above its 30. */
     .dash .dash-scrim {
         position: fixed;
         top: var(--dash-bar-h);
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 30;
+        z-index: 10;
         border: 0;
         padding: 0;
         background: var(--scrim);
