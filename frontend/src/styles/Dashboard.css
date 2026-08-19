@@ -1169,7 +1169,12 @@
     .dash .dash-side {
         width: auto;
         height: var(--dash-bar-h);
-        padding: 10px clamp(14px, 4vw, 40px);
+        /* 10px 14px flat, matching `.adm-side` exactly rather than the
+           `clamp(14px, 4vw, 40px)` this used. The clamp put the menu button at
+           x=16 against the admin's x=14 on a 390px screen - only 2px, but the
+           two bars are meant to be the same bar, and 10 + 44 + 10 is also where
+           --dash-bar-h: 64px comes from. */
+        padding: 10px 14px;
         flex-direction: row;
         align-items: center;
         overflow: visible;
@@ -1190,10 +1195,24 @@
         flex: 1;
         display: flex;
         align-items: center;
-        justify-content: space-between;
         gap: 12px;
         min-width: 0;
     }
+
+    /* The menu button sits at the LEFT edge, before the brand - the same as
+       `.adm-nav-toggle`, measured: admin toggle at x=14, and this one had ended
+       up at x=330 on a 390px screen. Two halves of one app opening their menu
+       from opposite corners is a thumb reaching to the wrong side every time you
+       switch role.
+
+       It is second in the DOM (DashboardLayout renders brand then toggle) so
+       `order` moves it visually without touching the markup, and the auto margin
+       on the brand does the spacing. NOT `justify-content: space-between`, which
+       is what this rule used to say: with an auto margin also present the two
+       fight, and `space-between` alone cannot reverse the order. */
+    .dash .dash-nav-toggle { order: -1; }
+    .dash .dash-side-top .dash-brand { margin-right: auto; }
+
     .dash .dash-brand { padding: 0; min-width: 0; }
     .dash .dash-brand-text b { font-size: 14px; }
 
