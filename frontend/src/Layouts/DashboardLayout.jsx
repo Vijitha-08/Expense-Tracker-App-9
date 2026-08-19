@@ -1,34 +1,34 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, NavLink } from "react-router-dom";
 import {
-    FiTrendingUp, FiLogOut, FiShield, FiUser, FiSun, FiMoon, FiMenu, FiX,
+    FiTrendingUp, FiLogOut, FiSun, FiMoon, FiMenu, FiX,
     FiGrid, FiSettings,
 } from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
 import { useDisplay } from "../context/useDisplay";
 import "../styles/Dashboard.css";
 
-const ROLE_LOOK = {
-    admin: { label: "Administrator", Icon: FiShield },
-    user:  { label: "User",          Icon: FiUser },
-};
+const ROLE_LABEL = { admin: "Administrator", user: "User" };
 
-// Matches the existing 720px mobile block in Dashboard.css rather than the
-// admin's 860px: this bar only ever holds a brand and two controls, so it has
-// no reason to collapse as early as a 250px sidebar does.
-const NAV_BREAKPOINT = 720;
+// 860px, the same figure AdminLayout uses, and deliberately not the 720px this
+// file used when the chrome was a top bar. A 250px sidebar beside a table needs
+// the same room whichever half of the app it is in, and two different collapse
+// points between the user and admin sides is the kind of inconsistency somebody
+// notices the first time they resize a window with both open.
+const NAV_BREAKPOINT = 860;
 
 // Two pages, listed here rather than hard-coded in the markup so a third one is
-// one line. Both links show at every width: a Settings-only bar would leave
-// somebody on Settings with no way back to the dashboard except the browser's
-// back button, since the brand mark goes to the public home page.
+// one line. Grouped under a heading the way the admin nav is, because the shape
+// has to survive a second group being added.
 const NAV = [
-    { to: "/user/dashboard", label: "Dashboard", Icon: FiGrid },
-    { to: "/user/settings",  label: "Settings",  Icon: FiSettings },
+    { group: "Overview", items: [
+        { to: "/user/dashboard", label: "Dashboard", Icon: FiGrid },
+        { to: "/user/settings",  label: "Settings",  Icon: FiSettings },
+    ]},
 ];
 
 // Same two-initial rule as the admin sidebar's `.adm-avatar`. Two, not three:
-// three initials on a 38px pip has to shrink the type to fit, and the pip is
+// three initials on a 34px pip has to shrink the type to fit, and the pip is
 // there to be recognised at a glance rather than read.
 const initials = (name) =>
     String(name || "?")
@@ -39,9 +39,20 @@ const initials = (name) =>
         .join("")
         .toUpperCase();
 
-// Shared chrome for the user pages: brand bar, page links, who is signed in,
-// the theme control and log out, plus an optional row of section tabs. The
-// Settings page passes tabs for its own sections; the dashboard does not.
+// Shared chrome for the user pages.
+//
+// WHAT CHANGED AND WHY: this was a sticky top bar with the brand on the left and
+// the name, theme button and Log out on the right, plus a mobile drawer added in
+// an earlier round. It is now the same structure as AdminLayout - a permanent
+// 250px sidebar that collapses to that same drawer below 860px - because the two
+// halves of the app were navigated in two different ways, and the user side had
+// no side panel at all on a laptop.
+//
+// The sidebar is on the LIGHT surface, not the admin's navy. The `.dash` tokens
+// are the light set, the drawer that shipped in the previous round was already
+// light and was signed off that way, and painting this navy would make the user
+// dashboard read as the admin panel rather than as its counterpart. Structure,
+// geometry and behaviour are the admin's; the palette stays the user's.
 const DashboardLayout = ({
     title, subtitle, children, actions, tabs, activeTab, onTabChange,
 }) => {
@@ -55,13 +66,13 @@ const DashboardLayout = ({
     const navigate = useNavigate();
     const [navOpen, setNavOpen] = useState(false);
 
-    const role = ROLE_LOOK[user?.role] || { label: user?.role, Icon: FiUser };
-    const RoleIcon = role.Icon;
-
+    // Closed from the link's own onClick rather than an effect on the pathname:
+    // setState inside an effect causes a second render pass, and the click is
+    // the moment we actually know the panel should go.
     const closeNav = () => setNavOpen(false);
 
     // A phone rotated to landscape can cross the breakpoint with the drawer
-    // open, stranding it over the desktop bar. Same guard as AdminLayout.
+    // open, stranding it over the desktop sidebar. Same guard as AdminLayout.
     useEffect(() => {
         const onResize = () => {
             if (window.innerWidth > NAV_BREAKPOINT) setNavOpen(false);
@@ -85,16 +96,21 @@ const DashboardLayout = ({
 
     return (
         <div className={`dash dash-${user?.role || "user"}`}>
-            <header className="dash-topbar">
-                {/* `.dash-bar-top` and `.dash-side-panel` are `display: contents`
-                    above 720px, so on a wide screen the brand and `.dash-user`
-                    stay direct flex children of `.dash-topbar` exactly as
-                    before and nothing about the desktop bar changes. Below it
-                    they become real boxes: a bar, and a drawer beneath it. */}
-                <div className="dash-bar-top">
+            <aside className={`dash-side${navOpen ? " dash-side--open" : ""}`}>
+                {/* `.dash-side-top` and `.dash-side-panel` are `display: contents`
+                    above 860px, so on a wide screen the brand, the nav and the
+                    footer are direct flex children of `.dash-side` and
+                    `margin-top: auto` on the footer still pins Log out to the
+                    bottom. Below it they become real boxes: a bar, and a drawer
+                    beneath it. Same trick AdminLayout uses, for the same
+                    reason. */}
+                <div className="dash-side-top">
                     <Link to="/" className="dash-brand" onClick={closeNav}>
                         <span className="dash-brand-mark" aria-hidden="true"><FiTrendingUp /></span>
-                        <span className="dash-brand-name">EXPENSE TRACKER</span>
+                        <span className="dash-brand-text">
+                            <b>Expense Tracker</b>
+                            <small>Your expenses</small>
+                        </span>
                     </Link>
 
                     <button
@@ -109,73 +125,69 @@ const DashboardLayout = ({
                     </button>
                 </div>
 
-                <div
-                    className={`dash-side-panel${navOpen ? " dash-side-panel--open" : ""}`}
-                    id="dash-side-panel"
-                >
-                    <div className="dash-user">
-                        <nav className="dash-nav" aria-label="Your pages">
-                            {/* The admin sidebar's group heading, matched here.
-                                Inside the <nav> rather than beside it so the
-                                drawer's own column layout puts it directly over
-                                the links with no extra wrapper; CSS hides it
-                                above 720px, where the bar has no room for a
-                                heading and does not need one. */}
-                            <p className="dash-nav-label">Overview</p>
-                            {NAV.map(({ to, label, Icon }) => (
-                                <NavLink
-                                    key={to}
-                                    to={to}
-                                    className={({ isActive }) =>
-                                        `dash-nav-link${isActive ? " dash-nav-on" : ""}`
-                                    }
-                                    onClick={closeNav}
-                                >
-                                    <Icon aria-hidden="true" />
-                                    {label}
-                                </NavLink>
-                            ))}
-                        </nav>
-                        <span className="dash-user-meta">
-                            {/* Drawer-only, by CSS. The desktop bar hides the
-                                name itself at that width for room, so a pip
-                                beside a hidden name would be decoration. */}
+                <div className="dash-side-panel" id="dash-side-panel">
+                    {NAV.map((section) => (
+                        <div key={section.group}>
+                            <p className="dash-nav-label">{section.group}</p>
+                            <nav className="dash-nav" aria-label={section.group}>
+                                {section.items.map(({ to, label, Icon }) => (
+                                    <NavLink
+                                        key={to}
+                                        to={to}
+                                        className={({ isActive }) =>
+                                            `dash-nav-link${isActive ? " dash-nav-on" : ""}`
+                                        }
+                                        onClick={closeNav}
+                                    >
+                                        <Icon aria-hidden="true" />
+                                        {label}
+                                    </NavLink>
+                                ))}
+                            </nav>
+                        </div>
+                    ))}
+
+                    <div className="dash-side-foot">
+                        <div className="dash-me">
                             <span className="dash-avatar" aria-hidden="true">
                                 {initials(user?.name)}
                             </span>
-                            <strong>{user?.name}</strong>
-                            <span className={`role-chip role-${user?.role}`}>
-                                <RoleIcon aria-hidden="true" /> {role.label}
+                            <span className="dash-me-text">
+                                <b>{user?.name}</b>
+                                <small>{ROLE_LABEL[user?.role] || user?.role}</small>
                             </span>
-                        </span>
-                        <button
-                            type="button"
-                            className="dash-theme"
-                            onClick={toggleTheme}
-                            aria-label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
-                            title={dark ? "Switch to light" : "Switch to dark"}
-                        >
-                            {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
-                            {/* Revealed only inside the drawer. One element with a
-                                hidden label beats a second icon-only button that
-                                exists purely for the other breakpoint - two
-                                buttons for one action is two things to keep in
-                                sync, and both would be in the tab order. */}
-                            <span className="dash-theme-label">
-                                {dark ? "Light theme" : "Dark theme"}
-                            </span>
-                        </button>
-                        <button className="btn btn-ghost dash-logout" onClick={handleLogout}>
+                            {/* One click to flip, next to the signed-in name where
+                                this control usually lives. It writes an explicit
+                                "light" or "dark", so using it opts out of following
+                                the device - Settings > Display is where you get
+                                "System" back, and it says so in the tooltip. */}
+                            <button
+                                type="button"
+                                className="dash-theme"
+                                onClick={toggleTheme}
+                                aria-label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
+                                title={dark
+                                    ? "Switch to light (Settings › Display to follow your device)"
+                                    : "Switch to dark (Settings › Display to follow your device)"}
+                            >
+                                {dark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
+                                <span className="dash-theme-label">
+                                    {dark ? "Light theme" : "Dark theme"}
+                                </span>
+                            </button>
+                        </div>
+                        <button type="button" className="dash-logout" onClick={handleLogout}>
                             <FiLogOut aria-hidden="true" /> Log out
                         </button>
                     </div>
                 </div>
-            </header>
+            </aside>
 
-            {/* Sibling of the header, not a child: inside it the scrim would join
-                the sticky bar's stacking context and paint over the bar it is
-                meant to sit behind. Tapping it closes the drawer, so the menu
-                can never trap you. */}
+            {/* Sibling of the aside, not a child: inside it the scrim would join
+                the sidebar's stacking context and paint over the bar it is meant
+                to sit behind - the bug that made this drawer render dimmed two
+                rounds ago. Tapping it closes the drawer, so the menu can never
+                trap you. */}
             {navOpen && (
                 <button
                     type="button"
@@ -185,33 +197,35 @@ const DashboardLayout = ({
                 />
             )}
 
-            <div className="dash-heading">
-                <div>
-                    <h1>{title}</h1>
-                    {subtitle && <p className="dash-sub">{subtitle}</p>}
+            <main className="dash-main">
+                <div className="dash-heading">
+                    <div>
+                        <h1>{title}</h1>
+                        {subtitle && <p className="dash-sub">{subtitle}</p>}
+                    </div>
+                    {actions && <div className="dash-heading-actions">{actions}</div>}
                 </div>
-                {actions && <div className="dash-heading-actions">{actions}</div>}
-            </div>
 
-            {tabs?.length > 0 && (
-                <nav className="dash-tabs" aria-label="Dashboard sections">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            className={`dash-tab${activeTab === tab.id ? " dash-tab-active" : ""}`}
-                            aria-current={activeTab === tab.id ? "page" : undefined}
-                            onClick={() => onTabChange(tab.id)}
-                        >
-                            {tab.Icon && <tab.Icon aria-hidden="true" />}
-                            {tab.label}
-                            {tab.count > 0 && <span className="count-pill">{tab.count}</span>}
-                        </button>
-                    ))}
-                </nav>
-            )}
+                {tabs?.length > 0 && (
+                    <nav className="dash-tabs" aria-label="Dashboard sections">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                className={`dash-tab${activeTab === tab.id ? " dash-tab-active" : ""}`}
+                                aria-current={activeTab === tab.id ? "page" : undefined}
+                                onClick={() => onTabChange(tab.id)}
+                            >
+                                {tab.Icon && <tab.Icon aria-hidden="true" />}
+                                {tab.label}
+                                {tab.count > 0 && <span className="count-pill">{tab.count}</span>}
+                            </button>
+                        ))}
+                    </nav>
+                )}
 
-            <main className="dash-body">{children}</main>
+                <div className="dash-body">{children}</div>
+            </main>
         </div>
     );
 };

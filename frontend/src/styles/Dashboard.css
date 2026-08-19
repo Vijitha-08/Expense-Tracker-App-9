@@ -33,7 +33,17 @@
 }
 
 .dash {
+    /* The sidebar's width, declared once. The main column is `flex: 1`, so it
+       never needs to restate this - and nothing needs a matching margin, which
+       is the whole reason the sidebar is `sticky` and not `fixed`. */
+    --dash-side-w: 250px;
+
     min-height: 100vh;
+    /* A flex ROW now, not a stacked column. `align-items: flex-start` so the
+       sidebar's `align-self: flex-start` + `height: 100vh` pins it to the
+       viewport instead of stretching to the length of the page. */
+    display: flex;
+    align-items: flex-start;
     background:
         radial-gradient(1200px 420px at 12% -8%, var(--accent-wash), transparent 62%),
         var(--page);
@@ -43,25 +53,50 @@
 }
 .dash *, .dash *::before, .dash *::after { box-sizing: border-box; }
 
-/* ---------- top bar ---------- */
-.dash .dash-topbar {
+/* ---------- sidebar ---------- */
+/* This was a sticky top bar: brand on the left, name + theme + Log out on the
+   right. It is now the same shape as the admin's `.adm-side` - a 250px column
+   pinned to the viewport - for the reason the admin comment gives: navigation
+   that scrolls off the top of a long page is navigation you have to scroll back
+   up to reach, and the expense table is the longest page in this app.
+
+   `position: sticky`, not `fixed`. Sticky keeps the sidebar in the flex row so
+   it still reserves its 250px and the main column needs no matching margin.
+   `height: 100vh` pins it to the viewport; the inner `overflow-y` means a short
+   screen scrolls the nav itself rather than clipping Log out off the bottom.
+
+   An inset box-shadow rather than `border-right`, copied from Admin.css and for
+   the same measured reason: `.dash *` sets `box-sizing: border-box`, so a 1px
+   border eats 1px of the declared 250px and reflows everything inside it. A
+   shadow paints the same hairline and costs no layout.
+
+   NO `backdrop-filter` here. The old top bar had one, and it made the bar the
+   containing block for the `position: fixed` drawer inside it - which is why the
+   drawer once rendered 36px tall with 207px of content in it. */
+.dash .dash-side {
+    width: var(--dash-side-w);
+    flex: none;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 14px clamp(16px, 4vw, 40px);
-    background: var(--card-veil);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    padding: 24px 18px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: inset -1px 0 0 var(--border);
+
     position: sticky;
     top: 0;
-    z-index: 20;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
+.dash .dash-side-top { display: flex; align-items: center; gap: 12px; }
+
 .dash .dash-brand {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 11px;
+    padding: 0 6px 22px;
     text-decoration: none;
     color: var(--ink);
 }
@@ -74,25 +109,124 @@
     background: var(--accent);
     color: var(--on-accent);
     font-size: 17px;
+    flex: none;
 }
-.dash .dash-brand-name {
+.dash .dash-brand-mark svg { width: 18px; height: 18px; }
+.dash .dash-brand-text b {
+    display: block;
+    font-size: 15.5px;
     font-weight: 800;
-    font-size: 14px;
-    letter-spacing: .1em;
+    letter-spacing: -.01em;
+}
+.dash .dash-brand-text small {
+    display: block;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 600;
+    margin-top: 1px;
 }
 
-.dash .dash-user {
-    display: flex;
-    align-items: center;
-    gap: 14px;
+/* ---------- sidebar footer: who is signed in, theme, log out ---------- */
+.dash .dash-side-foot {
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
 }
-.dash .dash-user-meta {
+.dash .dash-me {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 14px;
+    padding: 12px 6px;
+    flex-wrap: wrap;
 }
-.dash .dash-user-meta strong { font-weight: 700; }
+.dash .dash-me-text { min-width: 0; }
+.dash .dash-me-text b {
+    display: block;
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1.3;
+    /* A long name must not widen a fixed-width column. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash .dash-me-text small {
+    display: block;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 600;
+}
+.dash .dash-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 13px;
+    flex: none;
+}
+
+/* A labelled row on its own line, at every width - the admin's `.adm-theme-btn`
+   rule, on the user tokens. `flex: 0 0 100%` rather than `width: 100%` alone: a
+   flex item can still be shrunk back onto the previous line by its own
+   `flex-shrink`, and the wrap has to be guaranteed rather than likely. */
+.dash .dash-theme {
+    flex: 0 0 100%;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 9px;
+    height: 40px;
+    padding: 0 11px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--page-alt);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.dash .dash-theme:hover { border-color: var(--accent-line); color: var(--accent); }
+.dash .dash-theme svg { width: 16px; height: 16px; flex: none; }
+.dash .dash-theme { transition: color .15s ease, border-color .15s ease; }
+
+.dash .dash-logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: 100%;
+    height: 42px;
+    margin-top: 6px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--page-alt);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.dash .dash-logout:hover { border-color: var(--bad); color: var(--bad); }
+.dash .dash-logout svg { width: 16px; height: 16px; }
+
+/* ---------- main column ---------- */
+/* The horizontal padding lives here now instead of being repeated on the
+   heading, the tabs and the body - three places that had to be kept in step and
+   were the reason the tab row and the cards below it were once 2px out of
+   alignment with each other. */
+.dash .dash-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 30px clamp(20px, 2.6vw, 34px) 44px;
+}
 
 .dash .role-chip {
     display: inline-flex;
@@ -115,7 +249,6 @@
     justify-content: space-between;
     gap: 20px;
     flex-wrap: wrap;
-    padding: 30px clamp(16px, 4vw, 40px) 0;
 }
 .dash .dash-heading h1 {
     margin: 0;
@@ -136,7 +269,7 @@
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
-    padding: 22px clamp(16px, 4vw, 40px) 0;
+    padding-top: 22px;
 }
 .dash .dash-tab {
     display: inline-flex;
@@ -179,7 +312,7 @@
 
 /* ---------- body ---------- */
 .dash .dash-body {
-    padding: 22px clamp(16px, 4vw, 40px) 60px;
+    padding-top: 22px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -750,27 +883,18 @@
    and border so the pair reads as one control group; square and icon-only
    because it carries no label. Height is set from the Log out button's own
    padding rather than a round number, so the two line up at any font size. */
-.dash .dash-theme {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    /* 38px, matching the measured height of the Log out button beside it. At
-       40px this button became the tallest thing in the bar and pushed it from
-       67px to 69px, which moved the whole page down 2px - the desktop pixel
-       diff caught it as a 1635px page against main's 1633px. Exactly the same
-       mistake as the auth top bar; measured both times rather than guessed. */
-    width: 38px; height: 38px;
-    flex: none;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--surface);
-    color: var(--muted);
-    cursor: pointer;
-    transition: color .15s ease, border-color .15s ease;
-}
-.dash .dash-theme:hover { color: var(--accent); border-color: var(--accent-line); }
-.dash .dash-theme svg { width: 18px; height: 18px; }
+/* The 38x38 icon square that stood here is gone, and this is worth spelling out
+   because it was a REGRESSION I shipped: the square was written for the old top
+   bar, where there was no room for a word, and it sits LATER in this file than
+   the labelled `.dash-theme` row in the sidebar block above. Same specificity,
+   later wins - so the sidebar's full-width "Dark theme" button rendered as a
+   38px square with the label pushed out of view. Measured 38x38 where 214x40 was
+   expected. Deleting the old rule is the fix; the sidebar rule is the only one
+   now, and its transition moved up with it.
+
+   Its comment recorded a real constraint - 40px made the button the tallest
+   thing in the bar and moved the page down 2px - which no longer applies,
+   because the button is not in a bar. */
 
 .dash .btn-ghost {
     background: var(--surface);
@@ -876,13 +1000,15 @@
 
 /* ---------- narrow screens ---------- */
 @media (max-width: 720px) {
-    .dash .dash-topbar { flex-wrap: wrap; }
-    .dash .dash-brand-name { font-size: 12.5px; }
+    /* Three rules are gone from this block, not renamed: `.dash-topbar`,
+       `.dash-brand-name` and `.dash-user-meta strong` no longer exist. The bar
+       they styled is a sidebar, the brand carries a title and a subtitle rather
+       than one lettered word, and the name is never hidden now - the drawer has
+       room for it. */
     .dash .dash-heading { align-items: flex-start; flex-direction: column; }
     .dash .dash-heading-actions { width: 100%; }
     .dash .dash-heading-actions .btn { width: 100%; justify-content: center; }
     .dash .donut-wrap { justify-content: center; }
-        .dash .dash-user-meta strong { display: none; }
 }
 
 /* ============================================================
@@ -973,292 +1099,197 @@
 }
 
 /* ============================================================
-   MOBILE: THE BAR'S CONTROLS MOVE INTO A DRAWER
+   PAGE LINKS IN THE SIDEBAR
    ------------------------------------------------------------
-   Measured before: at 390px the top bar wrapped to two rows and
-   stood 123px tall, with the role chip, the theme button and Log
-   out sharing one 390px row. The bar is now a 64px row holding a
-   brand and a menu button, and those three controls live in a
-   left drawer with Log out pinned to its bottom edge.
-
-   `.dash-bar-top` and `.dash-side-panel` are `display: contents`
-   above 720px (block at the end of this file), so on a wide
-   screen the brand and `.dash-user` are still direct flex
-   children of `.dash-topbar` and the desktop bar is unchanged.
-   Same trick the admin sidebar uses, for the same reason.
+   A vertical list under a group heading, the admin's `.adm-nav`
+   shape on the user tokens. It reads the same open on a laptop as
+   it does inside the drawer on a phone - one DOM, no duplicate
+   markup per breakpoint.
    ============================================================ */
-@media (max-width: 720px) {
-    /* The drawer and the scrim start exactly below the bar. Declaring the
-       bar's height as a token is what makes that possible without measuring
-       the bar in JS: 10 + 44 + 10. */
-    .dash { --dash-bar-h: 64px; }
+.dash .dash-nav-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 8px;
+    margin: 14px 0 8px;
+}
+.dash .dash-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.dash .dash-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 12px;
+    border-radius: 11px;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    font-weight: 650;
+    text-decoration: none;
+}
+.dash .dash-nav-link svg { width: 17px; height: 17px; flex: none; }
+.dash .dash-nav-link:hover { background: var(--page-alt); color: var(--ink); }
+/* Filled, not merely coloured: colour alone is not a state, and `aria-current`
+   is doing the same job for a screen reader. */
+.dash .dash-nav-on,
+.dash .dash-nav-on:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 750;
+    box-shadow: var(--shadow-sm);
+}
 
-    .dash .dash-topbar {
+/* ============================================================
+   BELOW 860px: THE SIDEBAR BECOMES A BAR AND A DRAWER
+   ------------------------------------------------------------
+   860px, matching AdminLayout, because a 250px sidebar beside a
+   table needs the same room on both sides of the app.
+
+   `.dash-side-top` and `.dash-side-panel` are `display: contents`
+   above this width (block at the end of this section), so on a
+   wide screen the brand, the nav and the footer are direct flex
+   children of `.dash-side` and `margin-top: auto` still pins Log
+   out to the bottom. Below it they become real boxes.
+   ============================================================ */
+@media (max-width: 860px) {
+    /* The drawer and the scrim start exactly below the bar. Declaring the bar's
+       height as a token is what makes that possible without measuring it in JS:
+       10 + 44 + 10. */
+    .dash {
+        --dash-bar-h: 64px;
+        /* Back to a normal block flow: the sidebar is a bar across the top and
+           the main column is simply beneath it. */
+        display: block;
+    }
+
+    .dash .dash-side {
+        width: auto;
         height: var(--dash-bar-h);
         padding: 10px clamp(14px, 4vw, 40px);
-        /* Was `wrap`, for the two-row bar this replaces. */
-        flex-wrap: nowrap;
-        /* The blur has to go at this width, and not for taste: `backdrop-filter`
-           makes an element the containing block for its `position: fixed`
-           descendants, so the drawer's `top`/`bottom` resolved against this
-           64px bar instead of the viewport and it rendered 36px tall with 207px
-           of content inside it. An opaque bar also drops a per-frame blur on
-           scroll, which a phone notices. */
-        backdrop-filter: none;
+        flex-direction: row;
+        align-items: center;
+        overflow: visible;
+        box-shadow: none;
+        border-bottom: 1px solid var(--border);
+        /* Opaque, not the translucent veil the old bar used: the drawer slides
+           out from under it, and a see-through bar shows the drawer through
+           itself. Also see the no-backdrop-filter note above. */
         background: var(--surface);
+        /* 40, above the scrim's 30, so the menu button stays tappable while the
+           drawer is open. The drawer lives INSIDE this element, so it inherits
+           this rank against the scrim - which is the whole fix for the round
+           where the scrim painted over the drawer and made it look dimmed. */
+        z-index: 40;
     }
 
-    .dash .dash-bar-top {
+    .dash .dash-side-top {
+        flex: 1;
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 12px;
-        width: 100%;
+        min-width: 0;
     }
-
-    /* The menu button sits at the LEFT edge, before the brand. It is second in
-       the DOM, so `order` moves it visually without touching the markup - and
-       the auto margin has to move to whichever element then comes first, or
-       the row stops sitting flush. Exactly the fix the admin bar needed. */
-    .dash .dash-nav-toggle { order: -1; }
-    .dash .dash-bar-top .dash-brand { margin-right: auto; }
+    .dash .dash-brand { padding: 0; min-width: 0; }
+    .dash .dash-brand-text b { font-size: 14px; }
 
     .dash .dash-nav-toggle {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         /* 44px: the smallest target most thumbs hit reliably. */
-        width: 44px; height: 44px;
+        width: 44px;
+        height: 44px;
         flex: none;
-        padding: 0;
+        border-radius: 11px;
         border: 1px solid var(--border);
-        border-radius: var(--r-sm);
-        background: var(--surface);
-        color: var(--ink-soft);
+        background: var(--page-alt);
+        color: var(--ink);
         cursor: pointer;
     }
     .dash .dash-nav-toggle svg { width: 21px; height: 21px; }
-    .dash .dash-nav-toggle:active { background: var(--page-alt); }
+    .dash .dash-nav-toggle:active { background: var(--border); }
 
-    /* `visibility: hidden` rather than `display: none`: it can be transitioned,
+    /* A left drawer anchored to the viewport, not a block that expands the bar
+       downwards - that put Log out wherever the nav list happened to end, which
+       on a short phone was below the fold. Full height means Log out is always
+       at the bottom edge.
+
+       `visibility: hidden` rather than `display: none`: it can be transitioned,
        so the drawer slides, and unlike opacity alone it also takes the closed
-       drawer out of the tab order - a menu you cannot see but can still Tab
-       into is worse than one that does not animate. */
+       drawer out of the tab order. A menu you cannot see but can still Tab into
+       is worse than one that does not animate. */
     .dash .dash-side-panel {
         position: fixed;
         top: var(--dash-bar-h);
         left: 0;
         bottom: 0;
         width: min(300px, 84vw);
-        z-index: 45;
         display: flex;
         flex-direction: column;
-        padding: 18px 16px;
-        /* Same plane as the bar above it, so the drawer reads as one continuous
-           panel - the way the admin sidebar does. It was briefly `var(--page)`,
-           which is darker than the bar and made the whole drawer look dimmed,
-           as though the scrim were covering it. The scrim never touches it (the
-           drawer is z-index 45, the scrim 30); it was just the wrong token.
-           The controls below lift OFF this plane instead. */
+        padding: 14px 14px 16px;
         background: var(--surface);
-        border-right: 1px solid var(--border);
-        box-shadow: 10px 0 30px var(--img-shadow);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, .28);
         overflow-y: auto;
         visibility: hidden;
         transform: translateX(-100%);
         transition: transform .22s ease, visibility .22s linear;
     }
-    .dash .dash-side-panel--open {
+    .dash .dash-side--open .dash-side-panel {
         visibility: visible;
         transform: translateX(0);
     }
 
-    .dash .dash-side-panel .dash-user {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        flex: 1;
-    }
+    .dash .dash-nav-label { margin-top: 4px; }
+    /* 11px of padding around 13.5px text comes to 41px, under the 44px floor
+       every other control in this drawer clears. */
+    .dash .dash-nav-link { min-height: 44px; }
+    .dash .dash-nav-link svg { width: 18px; height: 18px; }
+    .dash .dash-theme { height: 44px; }
+    .dash .dash-theme svg { width: 19px; height: 19px; }
+    .dash .dash-logout { height: 44px; }
 
-    /* The name reads in full in here. It is hidden in the bar at this width
-       only because the bar had no room for it - the drawer does. */
-    /* Grid, not a flex column, and named areas rather than an extra wrapper
-       div: the pip spans both text rows on the left exactly as `.adm-me` does,
-       and the DOM stays flat so the desktop bar needs no `display: contents`
-       escape hatch. `minmax(0, 1fr)` on the text column so a long name
-       ellipsises inside the drawer instead of widening it. */
-    .dash .dash-side-panel .dash-user-meta {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        grid-template-areas:
-            "pip name"
-            "pip role";
-        align-items: center;
-        column-gap: 11px;
-        row-gap: 4px;
-        padding-bottom: 14px;
-        border-bottom: 1px solid var(--border-strong);
-    }
-    .dash .dash-side-panel .dash-avatar {
-        grid-area: pip;
-        display: grid;
-    }
-    .dash .dash-side-panel .dash-user-meta strong {
-        grid-area: name;
-        display: block;
-        font-size: 15px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .dash .dash-side-panel .dash-user-meta .role-chip {
-        grid-area: role;
-        justify-self: start;
-    }
-
-    /* An icon-plus-label row, not a 38px square: the square exists because the
-       desktop bar has no room for a word, and a drawer does. */
-    .dash .dash-side-panel .dash-theme {
-        width: 100%;
-        height: 44px;
-        justify-content: flex-start;
-        gap: 10px;
-        padding: 0 12px;
-        font: inherit;
-        font-size: 13.5px;
-        font-weight: 650;
-        color: var(--ink-soft);
-        /* RAISED off the panel, not level with it. Both controls used to be
-           `var(--surface)` - the same token as the panel - so in dark mode all
-           three were #171d2c and the two buttons were invisible, separated only
-           by a 1.34:1 hairline. `--page-alt` is the palette's raised plane, and
-           it lifts in both themes; the stronger rule and the card shadow carry
-           the rest, because on this palette a fill step alone never does. */
-        background: var(--page-alt);
-        border-color: var(--border-strong);
-        box-shadow: var(--shadow-sm);
-    }
-    .dash .dash-side-panel .dash-logout {
-        background: var(--page-alt);
-        border-color: var(--border-strong);
-        box-shadow: var(--shadow-sm);
-    }
-    .dash .dash-theme-label { display: inline; }
-
-    /* Pinned to the bottom edge, the way the reference does it. `.dash-logout`
-       was already a selector in this file with nothing rendering it - it now
-       has a real target, and picks up the 44px tap minimum below 900px. */
-    .dash .dash-side-panel .dash-logout {
-        margin-top: auto;
-        width: 100%;
-        height: 44px;
-        justify-content: center;
-    }
-
-    /* z-index 10, and the number matters. `.dash-topbar` is `position: sticky`
-       with `z-index: 20`, which makes it a STACKING CONTEXT - so the drawer's
-       own `z-index: 45` only ranks it inside the header, not against this
-       scrim. At 30 the scrim outranked the header's 20 and painted over the
-       whole header subtree, drawer included: measured, the drawer rendered
-       #090c16 instead of #171d2c, which is exactly #171d2c under a 66% black
-       veil. That is why the drawer looked dimmed. Below 20 it covers the page
-       (nothing there is above z-index 0) and never touches the drawer.
-       The admin gets this right by accident - its bar is 40, above its 30. */
+    /* 30, below the bar's 40 and above the page's auto, and it starts below the
+       bar. Getting this number wrong is what made the drawer render #090c16
+       instead of #171d2c in an earlier round - #171d2c under a 66% black veil.
+       The scrim is a SIBLING of the aside in the DOM for the same reason. */
     .dash .dash-scrim {
         position: fixed;
         top: var(--dash-bar-h);
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 10;
+        z-index: 30;
         border: 0;
         padding: 0;
         background: var(--scrim);
     }
+
+    /* The gutters move back onto the three children, because the main column no
+       longer sits beside anything. */
+    .dash .dash-main { padding: 0; }
+    .dash .dash-heading { padding: 24px clamp(16px, 4vw, 40px) 0; }
+    .dash .dash-tabs { padding: 20px clamp(16px, 4vw, 40px) 0; }
+    .dash .dash-body { padding: 20px clamp(16px, 4vw, 40px) 60px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .dash .dash-side-panel { transition: none; }
 }
 
-/* Above the breakpoint the two wrappers must not exist as boxes, or
-   `.dash-topbar` becomes a two-item row and the bar's `space-between` puts the
-   brand and the whole user group in the wrong places. `display: contents`
-   removes the box and promotes the children to flex items again. */
-@media (min-width: 721px) {
-    .dash .dash-bar-top,
+/* Above the breakpoint the two wrappers must not exist as boxes, or the sidebar
+   becomes a two-item column and `margin-top: auto` on the footer stops pushing
+   Log out to the bottom. `display: contents` removes the box and promotes the
+   children to flex items of `.dash-side` again. */
+@media (min-width: 861px) {
+    .dash .dash-side-top,
     .dash .dash-side-panel { display: contents; }
     .dash .dash-nav-toggle,
-    .dash .dash-theme-label,
     .dash .dash-scrim { display: none; }
-}
-
-/* ============================================================
-   PAGE LINKS IN THE BAR AND THE DRAWER
-   ------------------------------------------------------------
-   Two links today (Dashboard, Settings). They sit inside
-   `.dash-user`, so above 720px they are part of the top bar's
-   right-hand group and below it they are the first block in the
-   drawer - one DOM, no duplicate markup per breakpoint.
-   ============================================================ */
-.dash .dash-nav {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.dash .dash-nav-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 12px;
-    border-radius: var(--r-sm);
-    font-size: 13px;
-    font-weight: 650;
-    color: var(--muted);
-    text-decoration: none;
-    white-space: nowrap;
-}
-.dash .dash-nav-link svg { width: 15px; height: 15px; flex: none; }
-.dash .dash-nav-link:hover { background: var(--page-alt); color: var(--ink); }
-/* The current page reads as filled rather than merely coloured: colour alone is
-   not a state, and `aria-current` is doing the same job for a screen reader. */
-.dash .dash-nav-on,
-.dash .dash-nav-on:hover {
-    background: var(--accent-wash);
-    color: var(--accent);
-    box-shadow: inset 0 0 0 1px var(--accent-line);
-}
-
-/* The two pieces that make this drawer read as the admin sidebar's counterpart
-   rather than a top bar folded into a panel: a group heading over the links
-   (`.adm-nav-label`) and an initials pip beside the name (`.adm-avatar`).
-
-   Both are DRAWER-ONLY - `display: none` here, switched on in the 720px block.
-   They are one DOM either way, so the desktop bar is untouched: an "OVERVIEW"
-   heading and a 38px pip in a 64px-tall bar would be clutter, and the bar
-   already hides the name at that width for room. Verified 0 differing pixels
-   across the user dashboard and settings pages at 1440, 1200 and 900px. */
-.dash .dash-nav-label {
-    display: none;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--muted);
-    padding: 0 12px;
-    margin: 2px 0 8px;
-}
-.dash .dash-avatar {
-    display: none;
-    width: 38px;
-    height: 38px;
-    border-radius: var(--r-pill);
-    place-items: center;
-    background: var(--accent);
-    color: var(--on-accent);
-    font-size: 13.5px;
-    font-weight: 800;
-    letter-spacing: .02em;
-    flex: none;
 }
 
 /* ============================================================
@@ -1383,26 +1414,12 @@
     .dash .dash-switch i { transition: none; }
 }
 
-/* Below 720px the links become a stacked menu at the top of the drawer, above
-   the identity block, with a rule under them - the reference layout the drawer
-   was built from. */
+/* The four `.dash-side-panel .dash-nav*` overrides that stood here are gone. They
+   existed because the links were an inline row in a top bar and had to be
+   restacked for the drawer; the sidebar list is already a column at every width,
+   so they were restating the base rule - and the `border-bottom` they added under
+   the nav now doubles up with `.dash-side-foot`'s own `border-top`. */
 @media (max-width: 720px) {
-    .dash .dash-side-panel .dash-nav {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 2px;
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-        border-bottom: 1px solid var(--border-strong);
-    }
-    .dash .dash-side-panel .dash-nav-link {
-        min-height: 44px;
-        padding: 0 12px;
-        font-size: 13.5px;
-    }
-    .dash .dash-side-panel .dash-nav-link svg { width: 17px; height: 17px; }
-    .dash .dash-side-panel .dash-nav-label { display: block; }
-
     /* A settings row cannot stay a two-column row at 360px: the control ends up
        beside a two-line label with about 90px to live in. */
     .dash .dash-set-row {
