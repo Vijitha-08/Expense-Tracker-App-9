@@ -38,3 +38,5 @@ coverage/
 .cache/
 *.pem
 .pnpm-store/
+
+*.patch
