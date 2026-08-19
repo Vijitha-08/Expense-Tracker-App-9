@@ -26,7 +26,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 // A donut drawn with stroke-dasharray on concentric circles. Each slice is one
 // circle whose dash covers only its own share of the ring; the group is rotated
 // -90deg so the first slice starts at 12 o'clock instead of 3 o'clock.
-const CategoryDonut = ({ categories, title = "Where it goes", topN = 6 }) => {
+// `format` defaults to money() so existing callers are unaffected; the user
+// dashboard passes display.amount.
+const CategoryDonut = ({ categories, title = "Where it goes", topN = 6, format = money }) => {
     const total = categories.reduce((sum, c) => sum + Number(c.total), 0);
 
     if (!categories.length || total <= 0) {
@@ -97,7 +99,7 @@ const CategoryDonut = ({ categories, title = "Where it goes", topN = 6 }) => {
                     </svg>
                     <div className="donut-centre">
                         <span className="donut-centre-label">Total</span>
-                        <strong className="donut-centre-value">{money(total)}</strong>
+                        <strong className="donut-centre-value">{format(total)}</strong>
                     </div>
                 </div>
 
@@ -107,7 +109,7 @@ const CategoryDonut = ({ categories, title = "Where it goes", topN = 6 }) => {
                             <span className="legend-dot" style={{ background: c.color }} />
                             <span className="legend-name">{c.category}</span>
                             <span className="legend-pct">{percent(c.total, total)}%</span>
-                            <span className="legend-value mono">{money(c.total)}</span>
+                            <span className="legend-value mono">{format(c.total)}</span>
                         </li>
                     ))}
                 </ul>

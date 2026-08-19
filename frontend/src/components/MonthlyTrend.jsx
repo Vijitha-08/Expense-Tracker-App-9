@@ -6,7 +6,10 @@ import { moneyShort, monthLabel, money } from "../services/format";
 //
 // `months` arrives newest-first from the API (that is what the LIMIT needs),
 // so it is reversed here to read left-to-right like a calendar.
-const MonthlyTrend = ({ months, title = "Spend over time" }) => {
+// `format` defaults to money(), so a caller that does not pass one behaves
+// exactly as before. The user dashboard passes display.amount, which is what
+// makes Settings > Display > "estimated amounts" reach this chart.
+const MonthlyTrend = ({ months, title = "Spend over time", format = money }) => {
     const data = [...months].reverse();
 
     if (!data.length) {
@@ -26,7 +29,7 @@ const MonthlyTrend = ({ months, title = "Spend over time" }) => {
             <div className="panel-head">
                 <h3>{title}</h3>
                 <span className="panel-note">
-                    Peak {monthLabel(highest.month)} · {money(highest.total)}
+                    Peak {monthLabel(highest.month)} · {format(highest.total)}
                 </span>
             </div>
 
@@ -43,7 +46,7 @@ const MonthlyTrend = ({ months, title = "Spend over time" }) => {
                                 <div
                                     className="trend-bar trend-bar-solid"
                                     style={{ height: `${height}%` }}
-                                    title={`${monthLabel(m.month)}: ${money(m.total)} across ${m.count} ${
+                                    title={`${monthLabel(m.month)}: ${format(m.total)} across ${m.count} ${
                                         m.count === 1 ? "entry" : "entries"
                                     }`}
                                 />

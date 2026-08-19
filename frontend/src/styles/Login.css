@@ -586,7 +586,14 @@
     /* Two lines of brand text forced the bar to wrap to 138px - a sixth
        of the screen spent on chrome. The name alone still identifies
        the page; the tagline is landing-page copy. */
-    .auth-topbar { padding: 12px 16px; flex-wrap: nowrap; gap: 10px; }
+    /* WRAP, not nowrap. Measured at 360px: brand 132.9 + theme toggle 44 +
+       "Back to Home" 173.2 + two 10px gaps + 32px of padding = a 386px floor on
+       a 360px viewport. Every one of the five auth pages scrolled 26px sideways
+       and sliced the end off the Back link - the widest phone-sized defect in
+       the app. `nowrap` was added to stop the bar becoming two rows on a tablet;
+       it is not needed for that, because at tablet widths the content fits on
+       one line anyway and `wrap` only acts when it cannot. */
+    .auth-topbar { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
     .auth-theme { width: 44px; height: 44px; }
     .auth-brand-sub { display: none; }
     .auth-back {

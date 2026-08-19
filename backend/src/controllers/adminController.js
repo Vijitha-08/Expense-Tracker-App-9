@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const expenseModel = require("../models/expenseModel");
 const userModel = require("../models/userModel");
+const { toCsv, isoDay } = require("../utils/csv");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BCRYPT_ROUNDS = 12;
@@ -139,26 +140,17 @@ const getPerson = async (req, res) => {
     }
 };
 
-// ---------------------------------------------------------------
-// CSV export. Built by hand rather than with a library: five columns
-// do not justify a dependency, and quoting is the only real rule.
-// ---------------------------------------------------------------
-const csvCell = (value) => {
-    const s = value === null || value === undefined ? "" : String(value);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
-
 const exportExpenses = async (req, res) => {
     try {
         const expenses = await expenseModel.listExpenses({ limit: 500 });
         const header = ["Date", "Title", "Category", "Amount", "Added by", "Email", "Description"];
         const rows = expenses.map((e) => [
-            String(e.expense_date).slice(0, 10),
+            isoDay(e.expense_date),
             e.title, e.category, e.amount,
             e.owner_name, e.owner_email, e.description,
         ]);
 
-        const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
+        const csv = toCsv(header, rows);
 
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader("Content-Disposition", 'attachment; filename="expenses.csv"');

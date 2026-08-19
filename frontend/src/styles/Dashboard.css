@@ -311,7 +311,12 @@
 
 .dash .grid-2 {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    /* `min(330px, 100%)`, not a bare 330px: with auto-fit a track whose minimum
+       exceeds the container still takes its minimum, so at 360px - a 328px
+       content box - the grid rendered 330px wide and overflowed by exactly 2px.
+       The min() clamps the floor to the container when it is narrower. No effect
+       at any width where 330px already fits. */
+    grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
     gap: 20px;
     align-items: start;
 }
@@ -938,7 +943,23 @@
        without moving the text or changing the visual rhythm. */
     .dash .btn,
     .dash .dash-nav a,
+    .dash .dash-nav-link,
+    .dash .dash-brand,
+    .dash .dash-tab,
     .dash .dash-logout { min-height: 44px; }
+
+    /* `.dash-nav a` never matched the brand: `.dash-brand` is a SIBLING of
+       `.dash-nav`, not a link inside it. So the brand link stayed at 34px - the
+       exact defect the comment above this block lists as fixed. Named directly
+       now. `.dash-tab` (33px) and `.dash-nav-link` were never listed at all.
+
+       Text inputs and textareas get the same floor: the font-size rule above
+       stops iOS zooming on focus, which is a different problem from the box
+       being too small to hit. Checkboxes and radios are excluded because a 44px
+       checkbox is a 44px square of ink, not a bigger target - their label
+       carries the tap area. */
+    .dash input:not([type="checkbox"]):not([type="radio"]),
+    .dash textarea { min-height: 44px; }
 
     /* `.btn-tiny` is the row-level Edit/Delete pair. It keeps its
        small type - only the box grows. */
@@ -1060,16 +1081,38 @@
 
     /* The name reads in full in here. It is hidden in the bar at this width
        only because the bar had no room for it - the drawer does. */
+    /* Grid, not a flex column, and named areas rather than an extra wrapper
+       div: the pip spans both text rows on the left exactly as `.adm-me` does,
+       and the DOM stays flat so the desktop bar needs no `display: contents`
+       escape hatch. `minmax(0, 1fr)` on the text column so a long name
+       ellipsises inside the drawer instead of widening it. */
     .dash .dash-side-panel .dash-user-meta {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "pip name"
+            "pip role";
+        align-items: center;
+        column-gap: 11px;
+        row-gap: 4px;
         padding-bottom: 14px;
         border-bottom: 1px solid var(--border-strong);
     }
+    .dash .dash-side-panel .dash-avatar {
+        grid-area: pip;
+        display: grid;
+    }
     .dash .dash-side-panel .dash-user-meta strong {
+        grid-area: name;
         display: block;
         font-size: 15px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .dash .dash-side-panel .dash-user-meta .role-chip {
+        grid-area: role;
+        justify-self: start;
     }
 
     /* An icon-plus-label row, not a 38px square: the square exists because the
@@ -1147,4 +1190,236 @@
     .dash .dash-nav-toggle,
     .dash .dash-theme-label,
     .dash .dash-scrim { display: none; }
+}
+
+/* ============================================================
+   PAGE LINKS IN THE BAR AND THE DRAWER
+   ------------------------------------------------------------
+   Two links today (Dashboard, Settings). They sit inside
+   `.dash-user`, so above 720px they are part of the top bar's
+   right-hand group and below it they are the first block in the
+   drawer - one DOM, no duplicate markup per breakpoint.
+   ============================================================ */
+.dash .dash-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.dash .dash-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.dash .dash-nav-link svg { width: 15px; height: 15px; flex: none; }
+.dash .dash-nav-link:hover { background: var(--page-alt); color: var(--ink); }
+/* The current page reads as filled rather than merely coloured: colour alone is
+   not a state, and `aria-current` is doing the same job for a screen reader. */
+.dash .dash-nav-on,
+.dash .dash-nav-on:hover {
+    background: var(--accent-wash);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+/* The two pieces that make this drawer read as the admin sidebar's counterpart
+   rather than a top bar folded into a panel: a group heading over the links
+   (`.adm-nav-label`) and an initials pip beside the name (`.adm-avatar`).
+
+   Both are DRAWER-ONLY - `display: none` here, switched on in the 720px block.
+   They are one DOM either way, so the desktop bar is untouched: an "OVERVIEW"
+   heading and a 38px pip in a 64px-tall bar would be clutter, and the bar
+   already hides the name at that width for room. Verified 0 differing pixels
+   across the user dashboard and settings pages at 1440, 1200 and 900px. */
+.dash .dash-nav-label {
+    display: none;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 12px;
+    margin: 2px 0 8px;
+}
+.dash .dash-avatar {
+    display: none;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--r-pill);
+    place-items: center;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    flex: none;
+}
+
+/* ============================================================
+   SETTINGS ROWS, PICKERS AND SWITCHES
+   ------------------------------------------------------------
+   The user counterparts of `.adm-set-row`, `.adm-pick` and
+   `.adm-switch`. Same shapes, built on the user tokens, so the
+   two settings pages behave identically without `.dash` having
+   to import anything from `Admin.css`.
+   ============================================================ */
+.dash .dash-set-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 15px 0;
+    border-top: 1px solid var(--border);
+}
+.dash .dash-set-row:first-of-type { border-top: 0; }
+.dash .dash-set-txt { min-width: 0; }
+.dash .dash-set-txt b {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--ink);
+}
+.dash .dash-set-txt small {
+    display: block;
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+}
+
+.dash .dash-hint { font-size: 12px; color: var(--muted); }
+
+/* Segmented control. `inset` box-shadow rather than a border so the selected
+   button does not change size when it gains its outline - a 1px border on the
+   active item alone shifts every sibling by a pixel. */
+.dash .dash-pick {
+    display: inline-flex;
+    flex: none;
+    gap: 3px;
+    padding: 3px;
+    border-radius: var(--r-sm);
+    background: var(--page-alt);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+.dash .dash-pick button {
+    padding: 7px 12px;
+    min-height: 34px;
+    border: 0;
+    border-radius: calc(var(--r-sm) - 2px);
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 650;
+    /* --ink-soft, not --muted: measured, --muted lands at 4.19:1 on the track's
+       --page-alt fill, under the 4.5 a 12.5px label needs. These are the
+       unselected options, not decoration - they have to be readable. */
+    color: var(--ink-soft);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.dash .dash-pick button:hover { color: var(--ink); }
+.dash .dash-pick .dash-pick-on,
+.dash .dash-pick .dash-pick-on:hover {
+    background: var(--surface);
+    color: var(--accent);
+    box-shadow: 0 1px 2px var(--img-shadow);
+}
+
+/* A real <button role="switch">, not a checkbox: the state is announced by
+   aria-checked and the whole control is one tab stop. */
+.dash .dash-switch {
+    flex: none;
+    width: 46px;
+    height: 27px;
+    padding: 3px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--border-strong);
+    cursor: pointer;
+    transition: background .16s ease;
+}
+.dash .dash-switch i {
+    display: block;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: 0 1px 3px var(--img-shadow);
+    transition: transform .16s ease;
+}
+.dash .dash-switch-on { background: var(--accent); }
+.dash .dash-switch-on i { transform: translateX(19px); }
+
+.dash .dash-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 16px 0 0;
+    padding: 12px 14px;
+    border-radius: var(--r-sm);
+    background: var(--page-alt);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+}
+.dash .dash-note svg { width: 15px; height: 15px; flex: none; margin-top: 1px; color: var(--muted); }
+
+.dash .btn-danger {
+    background: var(--bad-wash);
+    color: var(--bad);
+    border-color: var(--bad-line);
+}
+.dash .btn-danger:disabled { opacity: .6; cursor: not-allowed; }
+.dash .dash-danger { box-shadow: inset 0 0 0 1px var(--bad-line); }
+
+@media (prefers-reduced-motion: reduce) {
+    .dash .dash-switch,
+    .dash .dash-switch i { transition: none; }
+}
+
+/* Below 720px the links become a stacked menu at the top of the drawer, above
+   the identity block, with a rule under them - the reference layout the drawer
+   was built from. */
+@media (max-width: 720px) {
+    .dash .dash-side-panel .dash-nav {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--border-strong);
+    }
+    .dash .dash-side-panel .dash-nav-link {
+        min-height: 44px;
+        padding: 0 12px;
+        font-size: 13.5px;
+    }
+    .dash .dash-side-panel .dash-nav-link svg { width: 17px; height: 17px; }
+    .dash .dash-side-panel .dash-nav-label { display: block; }
+
+    /* A settings row cannot stay a two-column row at 360px: the control ends up
+       beside a two-line label with about 90px to live in. */
+    .dash .dash-set-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .dash .dash-pick { align-self: stretch; }
+    .dash .dash-pick button { flex: 1; }
+    .dash .dash-set-row .dash-switch { align-self: flex-start; }
+}
+
+/* `.form-row` is `repeat(auto-fit, minmax(150px, 1fr))`, so it keeps two columns
+   down to a 312px content box - fine for the expense drawer's Title/Amount pair,
+   too tight on this page, where 150px cannot hold an email address or the words
+   "Confirm new password". Scoped to the settings forms so the drawer, which is
+   already signed off at these widths, is untouched. */
+@media (max-width: 620px) {
+    .dash .dash-set-form .form-row { grid-template-columns: minmax(0, 1fr); }
 }

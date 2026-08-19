@@ -1,0 +1,1941 @@
+diff --git a/backend/.env.example b/backend/.env.example
+index 65c5302..f5d3933 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -30,3 +30,10 @@ SMTP_PORT=587
+ SMTP_USER=youraddress@gmail.com
+ SMTP_PASS=your_16_char_app_password
+ SMTP_FROM=Expense Tracker <youraddress@gmail.com>
++
++# Where messages from the public "Contact Us" form are sent. Optional - it falls
++# back to SMTP_USER, so the form works as soon as SMTP above is filled in. Set it
++# when the inbox that should read those messages is not the account sending them.
++# Messages are saved to the contact_messages table either way, so nothing is lost
++# if this is wrong or if SMTP is not configured at all.
++CONTACT_TO=youraddress@gmail.com
+diff --git a/backend/src/controllers/adminController.js b/backend/src/controllers/adminController.js
+index 1bd1a27..5b209cb 100644
+--- a/backend/src/controllers/adminController.js
++++ b/backend/src/controllers/adminController.js
+@@ -1,6 +1,7 @@
+ const bcrypt = require("bcrypt");
+ const expenseModel = require("../models/expenseModel");
+ const userModel = require("../models/userModel");
++const { toCsv, isoDay } = require("../utils/csv");
+ 
+ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+ const BCRYPT_ROUNDS = 12;
+@@ -139,26 +140,17 @@ const getPerson = async (req, res) => {
+     }
+ };
+ 
+-// ---------------------------------------------------------------
+-// CSV export. Built by hand rather than with a library: five columns
+-// do not justify a dependency, and quoting is the only real rule.
+-// ---------------------------------------------------------------
+-const csvCell = (value) => {
+-    const s = value === null || value === undefined ? "" : String(value);
+-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+-};
+-
+ const exportExpenses = async (req, res) => {
+     try {
+         const expenses = await expenseModel.listExpenses({ limit: 500 });
+         const header = ["Date", "Title", "Category", "Amount", "Added by", "Email", "Description"];
+         const rows = expenses.map((e) => [
+-            String(e.expense_date).slice(0, 10),
++            isoDay(e.expense_date),
+             e.title, e.category, e.amount,
+             e.owner_name, e.owner_email, e.description,
+         ]);
+ 
+-        const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
++        const csv = toCsv(header, rows);
+ 
+         res.setHeader("Content-Type", "text/csv; charset=utf-8");
+         res.setHeader("Content-Disposition", 'attachment; filename="expenses.csv"');
+diff --git a/backend/src/controllers/contactController.js b/backend/src/controllers/contactController.js
+new file mode 100644
+index 0000000..bdfb15b
+--- /dev/null
++++ b/backend/src/controllers/contactController.js
+@@ -0,0 +1,115 @@
++const { createMessage, markEmailed, countRecentFrom } = require("../models/contactModel");
++const { sendContactMessage, mailConfigured } = require("../services/mailer");
++
++// The public "Contact Us" form on the landing page.
++//
++// Public by necessity: somebody who has not signed up is exactly who this form
++// is for, so there is no token to check. That makes it the only unauthenticated
++// WRITE endpoint in the app, which is why it carries its own limits instead of
++// borrowing the login ones.
++const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
++
++// Matched to the column widths in contactModel so a long paste is trimmed here
++// rather than rejected by Postgres with a 500.
++const LIMITS = { name: 100, email: 150, message: 2000 };
++
++// Two ceilings, because they fail differently:
++//
++//   * per IP, in memory - stops a script hammering the endpoint right now.
++//     Immediate and free, but lost on restart.
++//   * per email, in the database - stops the same person filling the table over
++//     an afternoon, and survives a restart.
++//
++// Deliberately NOT a rate-limit library: one endpoint does not justify a new
++// dependency, and express-rate-limit is not in package.json.
++//
++// WORTH KNOWING: req.ip is the socket address unless Express is told to trust a
++// proxy. Behind one (Render, nginx, Cloudflare) every request looks like the
++// same IP, so the per-IP gate gets stricter, not looser - it fails safe. If this
++// is ever deployed behind a proxy, set `app.set("trust proxy", 1)` in server.js
++// so the real address is used.
++const IP_WINDOW_MS = 60 * 60 * 1000;
++const IP_MAX = 5;
++const EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
++const EMAIL_MAX = 10;
++
++const hits = new Map();     // ip -> array of timestamps inside the window
++
++// Swept on read rather than on a timer: a setInterval started from a request
++// handler keeps the process alive and never gets cleared in tests.
++const recentHits = (ip, now) => {
++    const fresh = (hits.get(ip) || []).filter((t) => now - t < IP_WINDOW_MS);
++    if (fresh.length) hits.set(ip, fresh);
++    else hits.delete(ip);
++    return fresh;
++};
++
++const clean = (value, max) => String(value ?? "").trim().slice(0, max);
++
++const sendMessage = async (req, res) => {
++    const now = Date.now();
++    const ip = req.ip || req.socket?.remoteAddress || "unknown";
++
++    const name = clean(req.body?.name, LIMITS.name);
++    const email = clean(req.body?.email, LIMITS.email).toLowerCase();
++    const message = clean(req.body?.message, LIMITS.message);
++
++    // Checked field by field. "Please fill in the form" makes somebody hunt for
++    // which box is wrong, and the form marks the field this names.
++    if (name.length < 2) {
++        return res.status(400).json({ message: "Please enter your name.", field: "name" });
++    }
++    if (!EMAIL_RE.test(email)) {
++        return res.status(400).json({ message: "Please enter a valid email address.", field: "email" });
++    }
++    if (message.length < 10) {
++        return res.status(400).json({
++            message: "Please write a little more so we know what you need - at least 10 characters.",
++            field: "message",
++        });
++    }
++
++    const fresh = recentHits(ip, now);
++    if (fresh.length >= IP_MAX) {
++        const wait = Math.max(1, Math.ceil((IP_WINDOW_MS - (now - fresh[0])) / 60000));
++        return res.status(429).json({
++            message: `That is a lot of messages at once. Please try again in about ${wait} minute${wait === 1 ? "" : "s"}.`,
++        });
++    }
++
++    try {
++        if ((await countRecentFrom(email, new Date(now - EMAIL_WINDOW_MS))) >= EMAIL_MAX) {
++            return res.status(429).json({
++                message: "We already have several messages from this address today - we will reply to those first.",
++            });
++        }
++
++        const row = await createMessage({ name, email, message });
++        // Counted only once the row is actually in. A request rejected above
++        // should not spend somebody's allowance.
++        hits.set(ip, [...fresh, now]);
++
++        // "Stored" is the promise this endpoint keeps, so a mail failure is
++        // logged and swallowed rather than turned into a 500 that tells the
++        // sender their message did not arrive. It did.
++        let delivered = false;
++        try {
++            ({ delivered } = await sendContactMessage({ name, email, message, id: row.id }));
++            if (delivered) await markEmailed(row.id);
++        } catch (err) {
++            console.error(`contact message #${row.id} was saved but not emailed:`, err.message);
++        }
++
++        return res.status(201).json({
++            message: "Thanks — your message has reached us. We will reply to that email address.",
++            id: row.id,
++            delivered,
++            emailConfigured: mailConfigured(),
++        });
++    } catch (err) {
++        console.error("contact form failed:", err);
++        return res.status(500).json({ message: "Could not send your message. Please try again." });
++    }
++};
++
++module.exports = { sendMessage };
+diff --git a/backend/src/controllers/expenseController.js b/backend/src/controllers/expenseController.js
+index 2bdffec..6edde49 100644
+--- a/backend/src/controllers/expenseController.js
++++ b/backend/src/controllers/expenseController.js
+@@ -1,4 +1,5 @@
+ const model = require("../models/expenseModel");
++const { toCsv, isoDay } = require("../utils/csv");
+ 
+ // Categories are free text, typed by the user rather than picked from a fixed
+ // list. Only length is enforced (the column is VARCHAR(50)); an empty value
+@@ -127,7 +128,41 @@ const getSummary = async (req, res) => {
+     }
+ };
+ 
++// ---------------------------------------------------------------
++// CSV export of the signed-in user's own expenses.
++//
++// A separate endpoint from the admin one on purpose: /api/admin/expenses/export
++// returns EVERY user's rows and is behind requireRole("admin"), so a user
++// calling it gets a 403. This route sits under the router's own
++// requireRole("user") and passes req.user.id, so it can only ever return the
++// caller's rows - the scoping is not a filter the client asks for.
++//
++// The 500 is the model's own hard cap (Math.min(limit, 500)) rather than a
++// number chosen here, so it is stated in the UI too. Someone with more than 500
++// entries would otherwise get a silently truncated file, which is worse than a
++// visible limit.
++const EXPORT_LIMIT = 500;
++
++const exportMyExpenses = async (req, res) => {
++    try {
++        const expenses = await model.listExpenses({ userId: req.user.id, limit: EXPORT_LIMIT });
++        const header = ["Date", "Title", "Category", "Amount", "Description"];
++        const rows = expenses.map((e) => [
++            isoDay(e.expense_date),
++            e.title, e.category, e.amount, e.description,
++        ]);
++
++        res.setHeader("Content-Type", "text/csv; charset=utf-8");
++        res.setHeader("Content-Disposition", 'attachment; filename="my-expenses.csv"');
++        return res.send(toCsv(header, rows));
++    } catch (err) {
++        console.error("exportMyExpenses failed:", err);
++        return res.status(500).json({ message: "Could not build the export" });
++    }
++};
++
+ module.exports = {
+     addExpense, getExpenses,
+     getExpense, updateExpense, deleteExpense, getSummary,
++    exportMyExpenses,
+ };
+diff --git a/backend/src/models/contactModel.js b/backend/src/models/contactModel.js
+new file mode 100644
+index 0000000..9e859ed
+--- /dev/null
++++ b/backend/src/models/contactModel.js
+@@ -0,0 +1,74 @@
++const db = require("../config/db");
++
++// Messages left on the public "Contact Us" form.
++//
++// Stored AND emailed, and the order matters: the row is written first, the email
++// is attempted after. Email is the part that fails for reasons nobody on this
++// side controls - a wrong app password, a blocked port, no SMTP configured at
++// all - and a message lost to that is a person who wrote in and got ignored. The
++// row is the record; the email is a notification about it.
++//
++// The table creates itself on first use rather than living in schema.sql, the
++// same way password_resets does and for the same reason: schema.sql is the file
++// that has already cost this project a round of data loss, and a new feature has
++// no business editing it. Everything here is additive - CREATE TABLE IF NOT
++// EXISTS on a table nothing else touches - so pulling this change needs no
++// migration step and cannot affect users or expenses.
++//
++// No user_id column. The whole point of a contact form on the landing page is
++// that somebody without an account can use it, so there is nothing to reference.
++let ready = null;
++
++const ensureTable = () => {
++    if (!ready) {
++        ready = db.query(`
++            CREATE TABLE IF NOT EXISTS contact_messages (
++                id          SERIAL PRIMARY KEY,
++                name        VARCHAR(100) NOT NULL,
++                email       VARCHAR(150) NOT NULL,
++                message     TEXT         NOT NULL,
++                emailed     BOOLEAN      NOT NULL DEFAULT FALSE,
++                created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
++            );
++            CREATE INDEX IF NOT EXISTS contact_messages_created_idx
++                ON contact_messages (created_at DESC);
++            CREATE INDEX IF NOT EXISTS contact_messages_email_idx
++                ON contact_messages (email);
++        `).catch((err) => {
++            ready = null;              // let the next request try again
++            throw err;
++        });
++    }
++    return ready;
++};
++
++const createMessage = async ({ name, email, message }) => {
++    await ensureTable();
++    const { rows } = await db.query(
++        `INSERT INTO contact_messages (name, email, message)
++         VALUES ($1, $2, $3)
++         RETURNING id, created_at`,
++        [name, email, message]
++    );
++    return rows[0];
++};
++
++// Set once the notification has actually gone out, so an un-emailed backlog is
++// findable later instead of being indistinguishable from a delivered one.
++const markEmailed = async (id) => {
++    await db.query("UPDATE contact_messages SET emailed = TRUE WHERE id = $1", [id]);
++};
++
++// How many messages this address has sent since `since`. The per-IP ceiling in
++// the controller is the first gate; this is the one that survives a restart,
++// because an in-memory counter does not.
++const countRecentFrom = async (email, since) => {
++    await ensureTable();
++    const { rows } = await db.query(
++        "SELECT COUNT(*)::int AS n FROM contact_messages WHERE email = $1 AND created_at > $2",
++        [email, since]
++    );
++    return rows[0].n;
++};
++
++module.exports = { createMessage, markEmailed, countRecentFrom };
+diff --git a/backend/src/routes/contactRoutes.js b/backend/src/routes/contactRoutes.js
+new file mode 100644
+index 0000000..3193f40
+--- /dev/null
++++ b/backend/src/routes/contactRoutes.js
+@@ -0,0 +1,12 @@
++const express = require("express");
++const router = express.Router();
++
++const { sendMessage } = require("../controllers/contactController");
++
++// No auth middleware, on purpose: the form sits on the public landing page and
++// the people it is for do not have accounts yet. The abuse controls - a length
++// ceiling per field, a per-IP hourly cap and a per-address daily cap - are in
++// the controller rather than here, because they need the request body.
++router.post("/", sendMessage);
++
++module.exports = router;
+diff --git a/backend/src/routes/expenseRoutes.js b/backend/src/routes/expenseRoutes.js
+index 1e64f17..a0b532f 100644
+--- a/backend/src/routes/expenseRoutes.js
++++ b/backend/src/routes/expenseRoutes.js
+@@ -3,7 +3,7 @@ const router = express.Router();
+ 
+ const {
+     addExpense, getExpenses,
+-    getExpense, updateExpense, deleteExpense, getSummary,
++    getExpense, updateExpense, deleteExpense, getSummary, exportMyExpenses,
+ } = require("../controllers/expenseController");
+ const auth = require("../middlewares/authMiddleware");
+ const { requireRole } = require("../middlewares/roleMiddleware");
+@@ -15,6 +15,10 @@ const { requireRole } = require("../middlewares/roleMiddleware");
+ router.use(auth, requireRole("user"));
+ 
+ router.get("/summary", getSummary);
++// BEFORE "/:id", not after. Express matches in declaration order, so with this
++// line below it the request for /expenses/export is captured by the :id route,
++// validId("export") fails and the download comes back 400 instead of a file.
++router.get("/export", exportMyExpenses);
+ router.post("/", addExpense);
+ router.get("/", getExpenses);
+ router.get("/:id", getExpense);
+diff --git a/backend/src/server.js b/backend/src/server.js
+index 29edf3f..9890336 100644
+--- a/backend/src/server.js
++++ b/backend/src/server.js
+@@ -72,6 +72,10 @@ app.use("/api/auth", require("./routes/authRoutes"));
+ app.use("/api/expenses", require("./routes/expenseRoutes"));
+ app.use("/api/admin", require("./routes/adminRoutes"));
+ app.use("/api/users", require("./routes/userRoutes"));
++// The public contact form. Mounted last of the four because it is the only one
++// with no auth middleware anywhere behind it - kept visible here rather than
++// buried, so nobody has to open the route file to learn that.
++app.use("/api/contact", require("./routes/contactRoutes"));
+ 
+ app.use((req, res) => res.status(404).json({ message: `No route for ${req.method} ${req.originalUrl}` }));
+ 
+diff --git a/backend/src/services/mailer.js b/backend/src/services/mailer.js
+index ca37a6e..f00f9b7 100644
+--- a/backend/src/services/mailer.js
++++ b/backend/src/services/mailer.js
+@@ -122,4 +122,92 @@ const sendResetCode = async ({ to, name, code, minutes }) => {
+     return { delivered: true };
+ };
+ 
+-module.exports = { sendResetCode, verifyTransport, mailConfigured: () => CONFIGURED };
++// ------------------------------------------------------------------
++// Contact form notification
++// ------------------------------------------------------------------
++// A different shape of email from the reset code, and the differences are the
++// point:
++//
++//   * it goes TO the site owner, not to the person who filled in the form, so
++//     the address comes from CONTACT_TO (falling back to SMTP_USER - the account
++//     already sending, which is a sane default rather than a silent nowhere).
++//   * replyTo is the sender, so hitting Reply in a mail client answers them
++//     without anybody copying an address out by hand.
++//   * it does NOT throw in production when SMTP is unconfigured. sendResetCode
++//     refuses because the alternative is printing a working credential into a
++//     log. There is no credential here, and the message is already saved in the
++//     database - refusing would turn "we could not email you about it" into "we
++//     could not accept it", which is worse and untrue.
++const contactPlain = ({ name, email, message, id }) =>
++    `New message from the Expense Tracker contact form.
++
++From:    ${name} <${email}>
++Message #${id}
++
++${message}
++
++Reply to this email to answer them directly.`;
++
++// The sender's words go in a <pre> so line breaks survive, and it is the only
++// place in this file that renders text somebody else typed. React escapes for
++// us everywhere in the app EXCEPT here, where the HTML is built by hand - so it
++// is escaped explicitly. Without this, a message containing "<script>" would be
++// live markup in whoever opens the notification.
++const escapeHtml = (s) =>
++    String(s)
++        .replace(/&/g, "&amp;")
++        .replace(/</g, "&lt;")
++        .replace(/>/g, "&gt;")
++        .replace(/"/g, "&quot;");
++
++const contactHtml = ({ name, email, message, id }) => `
++<div style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
++            max-width:560px;margin:0 auto;padding:8px 4px;color:#0f172a">
++  <p style="font-size:15px;margin:0 0 4px">
++    New message from the <b>Expense Tracker</b> contact form.
++  </p>
++  <p style="font-size:13.5px;color:#5e6e85;margin:0 0 18px">
++    Message #${id} &middot; reply to this email to answer them directly.
++  </p>
++  <table style="font-size:14px;border-collapse:collapse;margin-bottom:16px">
++    <tr><td style="padding:2px 12px 2px 0;color:#5e6e85">Name</td>
++        <td style="padding:2px 0"><b>${escapeHtml(name)}</b></td></tr>
++    <tr><td style="padding:2px 12px 2px 0;color:#5e6e85">Email</td>
++        <td style="padding:2px 0"><a href="mailto:${escapeHtml(email)}"
++            style="color:#4f46e5">${escapeHtml(email)}</a></td></tr>
++  </table>
++  <pre style="margin:0;padding:16px;background:#f6f7fb;border:1px solid #e4e7f2;
++              border-radius:12px;font:inherit;font-size:14.5px;
++              white-space:pre-wrap;word-break:break-word">${escapeHtml(message)}</pre>
++</div>`;
++
++const sendContactMessage = async ({ name, email, message, id }) => {
++    if (!CONFIGURED) {
++        console.log(
++            `\n  [contact form] SMTP not configured - not emailed.` +
++            `\n  #${id} from ${name} <${email}>` +
++            `\n  The message IS saved in contact_messages.` +
++            `\n  Set SMTP_HOST / SMTP_USER / SMTP_PASS in backend/.env to be notified by email.\n`
++        );
++        return { delivered: false };
++    }
++
++    await getTransport().sendMail({
++        from: process.env.SMTP_FROM || process.env.SMTP_USER,
++        to: process.env.CONTACT_TO || process.env.SMTP_USER,
++        // Not `from`: some providers refuse to send a message claiming to be
++        // from an address they do not own, which is why the sender goes here.
++        replyTo: `${name} <${email}>`,
++        subject: `Contact form: ${name}`,
++        text: contactPlain({ name, email, message, id }),
++        html: contactHtml({ name, email, message, id }),
++    });
++    return { delivered: true };
++};
++
++module.exports = {
++    sendResetCode,
++    sendContactMessage,
++    verifyTransport,
++    mailConfigured: () => CONFIGURED,
++};
+diff --git a/backend/src/utils/csv.js b/backend/src/utils/csv.js
+new file mode 100644
+index 0000000..2e8af44
+--- /dev/null
++++ b/backend/src/utils/csv.js
+@@ -0,0 +1,43 @@
++// Helpers for building CSV exports: cell quoting, row joining, and the one date
++// format a spreadsheet will actually parse.
++//
++// This lived as a private helper inside adminController.js. The user-facing
++// export needs the identical rule, and a copy in a second controller would mean
++// two places to fix the same quoting bug - the one thing this function exists to
++// get right. `src/utils/` was already in the tree and empty; this is what it is
++// for.
++//
++// Built by hand rather than with a library: quoting is the only real rule, and
++// seven columns do not justify a dependency.
++//
++// A cell is quoted only when it has to be - a comma, a double quote or a newline
++// in the value - and an embedded quote is doubled, which is what RFC 4180 asks
++// for and what Excel and Sheets both read back correctly.
++const csvCell = (value) => {
++    const s = value === null || value === undefined ? "" : String(value);
++    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
++};
++
++// Rows joined with CRLF, again per RFC 4180: a bare \n is fine in most tools but
++// Excel on Windows is the one that notices.
++const toCsv = (header, rows) =>
++    [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
++
++// A pg DATE column arrives as a JavaScript Date, and the existing exports wrote
++// `String(e.expense_date).slice(0, 10)` - which on a Date gives "Mon Aug 17".
++// That is not a date any spreadsheet parses, and it silently drops the year.
++//
++// Built from LOCAL parts, not toISOString(): pg hands back the date at local
++// midnight, so in any timezone behind UTC toISOString() rolls it to the previous
++// day. The same trap is called out in ExpenseForm.jsx's today() and in
++// format.js's prettyDate, for the same reason.
++const isoDay = (value) => {
++    if (value === null || value === undefined) return "";
++    if (value instanceof Date) {
++        return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
++    }
++    // Already a string from the driver or a plain "YYYY-MM-DD": take the day part.
++    return String(value).slice(0, 10);
++};
++
++module.exports = { csvCell, toCsv, isoDay };
+diff --git a/frontend/src/App.css b/frontend/src/App.css
+index 9ba0a96..445ab8f 100644
+--- a/frontend/src/App.css
++++ b/frontend/src/App.css
+@@ -132,7 +132,16 @@ body {
+    every route paints its own full-height background over it (`.adm`, `.dash`,
+    `.auth` and the landing sections all do), so this is only ever seen in the
+    over-scroll gutter. */
+-:root[data-theme="dark"] body { background: var(--dk-page); }
++:root[data-theme="dark"] body { background: var(--dk-page); color: var(--dk-ink); }
++
++/* The colour half of that was missing, and it is not cosmetic. `body { color:
++   var(--ink) }` at the top of this file sits OUTSIDE the dark scope - dark
++   remaps its tokens on `.site`, `.auth` and `.dash`, not on the document - so
++   anything that inherits its ink from the body rather than from one of those
++   three roots painted #0f172a on a #0b1020 page: near-black on near-black.
++   Nothing in the app relies on that inheritance today, which is why it was not
++   visible, but the next element added outside those three wrappers would have
++   rendered invisible in dark mode with no clue why. */
+ 
+ .navbar {
+     display: flex;
+@@ -429,19 +438,13 @@ body {
+     resize: none;
+ }
+ 
+-.contact-form button {
+-    padding: 15px;
+-    background: var(--accent);
+-    color: white;
+-    border: none;
+-    border-radius: 10px;
+-    font-size: 18px;
+-    cursor: pointer;
+-}
+-
+-.contact-form button:hover {
+-    background: var(--accent);
+-}
++/* The `.contact-form button` rule that stood here was dead. Every one of its
++   declarations is overridden by the themed rule further down this file, which
++   sets `--fill`/`--on-fill` instead of hardcoding `var(--accent)` and `white` -
++   and a hardcoded white on a hardcoded accent is exactly the pair that breaks
++   when the palette moves. Its `:hover` was dead twice over: it set the
++   background to the same value as the rest state, so hovering did nothing.
++   Removed rather than left as a decoy for the next person reading this file. */
+ 
+ 
+ /* ================= FOOTER ================= */
+@@ -757,6 +760,43 @@ body {
+     cursor: pointer;
+ }
+ .contact-form button:hover { background: var(--fill-hover); }
++.contact-form button {
++    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
++}
++.contact-form button svg { width: 17px; height: 17px; }
++/* The form can be submitting now, and a control that looks identical while it
++   is busy invites a second and third press. */
++.contact-form button:disabled { opacity: .6; cursor: progress; }
++.contact-form input:disabled,
++.contact-form textarea:disabled { opacity: .7; }
++
++/* The placeholder was never styled, so it fell back to the browser default -
++   measured at 3.37:1 in light and 3.37:1 in DARK, the only contrast fault in
++   this app that fails in both themes. It is also the only label these three
++   fields had until now, which is why it mattered more here than anywhere else.
++   `opacity: 1` because Firefox applies its own to placeholders. */
++.contact-form input::placeholder,
++.contact-form textarea::placeholder { color: var(--muted); opacity: 1; }
++
++/* Where the server's answer lands. Not colour alone - each carries its own icon
++   from the component, and the wording says what happened.
++
++   Scoped `.contact .contact-note`, not `.contact-note`, and that is not tidiness:
++   `.contact p` above sets `color: var(--muted); margin-bottom: 40px` and the note
++   IS a <p> inside `.contact`. At equal-looking specificity it is (0,1,1) against
++   (0,1,0), so it wins - the first render of this came out muted grey with a 40px
++   gap under it instead of green or red. Caught by screenshot, not by reading:
++   getComputedStyle would have shown the same wrong answer as the page. */
++.contact .contact-note {
++    display: flex; align-items: flex-start; gap: 9px;
++    margin: 0 0 4px; padding: 12px 14px;
++    border-radius: var(--r-md);
++    border: 1px solid transparent;
++    font-size: 14.5px; font-weight: 600; text-align: left;
++}
++.contact .contact-note svg { flex: none; width: 17px; height: 17px; margin-top: 1px; }
++.contact .contact-note-ok  { background: var(--ok-wash);  border-color: var(--ok-line);  color: var(--ok); }
++.contact .contact-note-bad { background: var(--bad-wash); border-color: var(--bad-line); color: var(--bad); }
+ 
+ /* ---- footer ---- */
+ .footer { background: var(--footer); color: var(--footer-ink); }
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 73d21b5..4ac86fd 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -11,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
+ import UserRegister from "./pages/UserRegister";
+ import AdminRegister from "./pages/AdminRegister";
+ import UserDashboard from "./pages/UserDashboard";
++import UserSettings from "./pages/UserSettings";
+ 
+ import AdminDashboard from "./pages/AdminDashboard";
+ import AdminUsers from "./pages/AdminUsers";
+@@ -22,7 +23,13 @@ import AdminSettings from "./pages/AdminSettings";
+ import "./App.css";
+ 
+ // Each admin page is its own route rather than a tab inside one component, so
+-// the sidebar can highlight the current section and a link is shareable.
++// the sidebar can highlight the current section and a link is shareable. The
++// user side now has two pages for the same reason, listed the same way.
++const userPages = [
++  { path: "dashboard", Page: UserDashboard },
++  { path: "settings",  Page: UserSettings },
++];
++
+ const adminPages = [
+   { path: "dashboard", Page: AdminDashboard },
+   { path: "users",     Page: AdminUsers },
+@@ -52,14 +59,18 @@ function App() {
+             <Route path="/register/admin" element={<AdminRegister />} />
+ 
+             {/* role-gated */}
+-            <Route
+-              path="/user/dashboard"
+-              element={
+-                <ProtectedRoute allow={["user"]}>
+-                  <UserDashboard />
+-                </ProtectedRoute>
+-              }
+-            />
++            {userPages.map(({ path, Page }) => (
++              <Route
++                key={path}
++                path={`/user/${path}`}
++                element={
++                  <ProtectedRoute allow={["user"]}>
++                    <Page />
++                  </ProtectedRoute>
++                }
++              />
++            ))}
++            <Route path="/user" element={<Navigate to="/user/dashboard" replace />} />
+ 
+             {adminPages.map(({ path, Page }) => (
+               <Route
+diff --git a/frontend/src/Layouts/DashboardLayout.jsx b/frontend/src/Layouts/DashboardLayout.jsx
+index 0310976..7960fb1 100644
+--- a/frontend/src/Layouts/DashboardLayout.jsx
++++ b/frontend/src/Layouts/DashboardLayout.jsx
+@@ -1,7 +1,8 @@
+ import { useState, useEffect } from "react";
+-import { useNavigate, Link } from "react-router-dom";
++import { useNavigate, Link, NavLink } from "react-router-dom";
+ import {
+     FiTrendingUp, FiLogOut, FiShield, FiUser, FiSun, FiMoon, FiMenu, FiX,
++    FiGrid, FiSettings,
+ } from "react-icons/fi";
+ import { useAuth } from "../context/useAuth";
+ import { useDisplay } from "../context/useDisplay";
+@@ -17,15 +18,37 @@ const ROLE_LOOK = {
+ // no reason to collapse as early as a 250px sidebar does.
+ const NAV_BREAKPOINT = 720;
+ 
+-// Shared chrome for both dashboards: brand bar, who is signed in, log out, and
+-// an optional row of section tabs. The admin passes tabs; the user does not,
+-// which is part of why the two pages read as different products.
++// Two pages, listed here rather than hard-coded in the markup so a third one is
++// one line. Both links show at every width: a Settings-only bar would leave
++// somebody on Settings with no way back to the dashboard except the browser's
++// back button, since the brand mark goes to the public home page.
++const NAV = [
++    { to: "/user/dashboard", label: "Dashboard", Icon: FiGrid },
++    { to: "/user/settings",  label: "Settings",  Icon: FiSettings },
++];
++
++// Same two-initial rule as the admin sidebar's `.adm-avatar`. Two, not three:
++// three initials on a 38px pip has to shrink the type to fit, and the pip is
++// there to be recognised at a glance rather than read.
++const initials = (name) =>
++    String(name || "?")
++        .trim()
++        .split(/\s+/)
++        .slice(0, 2)
++        .map((w) => w[0])
++        .join("")
++        .toUpperCase();
++
++// Shared chrome for the user pages: brand bar, page links, who is signed in,
++// the theme control and log out, plus an optional row of section tabs. The
++// Settings page passes tabs for its own sections; the dashboard does not.
+ const DashboardLayout = ({
+     title, subtitle, children, actions, tabs, activeTab, onTabChange,
+ }) => {
+     const { user, logout } = useAuth();
+-    // The user side has no Settings page, so this bar is the only place a
+-    // theme control can live. Same shared preference as the navbar and the
++    // One-click flip, kept here as well as on Settings > Display: this is the
++    // control you reach for while looking at the page, and Settings is where you
++    // go to pick "System" again. Same shared preference as the navbar and the
+     // admin sidebar.
+     const { resolvedTheme, toggleTheme } = useDisplay();
+     const dark = resolvedTheme === "dark";
+@@ -91,7 +114,35 @@ const DashboardLayout = ({
+                     id="dash-side-panel"
+                 >
+                     <div className="dash-user">
++                        <nav className="dash-nav" aria-label="Your pages">
++                            {/* The admin sidebar's group heading, matched here.
++                                Inside the <nav> rather than beside it so the
++                                drawer's own column layout puts it directly over
++                                the links with no extra wrapper; CSS hides it
++                                above 720px, where the bar has no room for a
++                                heading and does not need one. */}
++                            <p className="dash-nav-label">Overview</p>
++                            {NAV.map(({ to, label, Icon }) => (
++                                <NavLink
++                                    key={to}
++                                    to={to}
++                                    className={({ isActive }) =>
++                                        `dash-nav-link${isActive ? " dash-nav-on" : ""}`
++                                    }
++                                    onClick={closeNav}
++                                >
++                                    <Icon aria-hidden="true" />
++                                    {label}
++                                </NavLink>
++                            ))}
++                        </nav>
+                         <span className="dash-user-meta">
++                            {/* Drawer-only, by CSS. The desktop bar hides the
++                                name itself at that width for room, so a pip
++                                beside a hidden name would be decoration. */}
++                            <span className="dash-avatar" aria-hidden="true">
++                                {initials(user?.name)}
++                            </span>
+                             <strong>{user?.name}</strong>
+                             <span className={`role-chip role-${user?.role}`}>
+                                 <RoleIcon aria-hidden="true" /> {role.label}
+diff --git a/frontend/src/components/CategoryDonut.jsx b/frontend/src/components/CategoryDonut.jsx
+index c63c3c1..d2bfd6e 100644
+--- a/frontend/src/components/CategoryDonut.jsx
++++ b/frontend/src/components/CategoryDonut.jsx
+@@ -26,7 +26,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+ // A donut drawn with stroke-dasharray on concentric circles. Each slice is one
+ // circle whose dash covers only its own share of the ring; the group is rotated
+ // -90deg so the first slice starts at 12 o'clock instead of 3 o'clock.
+-const CategoryDonut = ({ categories, title = "Where it goes", topN = 6 }) => {
++// `format` defaults to money() so existing callers are unaffected; the user
++// dashboard passes display.amount.
++const CategoryDonut = ({ categories, title = "Where it goes", topN = 6, format = money }) => {
+     const total = categories.reduce((sum, c) => sum + Number(c.total), 0);
+ 
+     if (!categories.length || total <= 0) {
+@@ -97,7 +99,7 @@ const CategoryDonut = ({ categories, title = "Where it goes", topN = 6 }) => {
+                     </svg>
+                     <div className="donut-centre">
+                         <span className="donut-centre-label">Total</span>
+-                        <strong className="donut-centre-value">{money(total)}</strong>
++                        <strong className="donut-centre-value">{format(total)}</strong>
+                     </div>
+                 </div>
+ 
+@@ -107,7 +109,7 @@ const CategoryDonut = ({ categories, title = "Where it goes", topN = 6 }) => {
+                             <span className="legend-dot" style={{ background: c.color }} />
+                             <span className="legend-name">{c.category}</span>
+                             <span className="legend-pct">{percent(c.total, total)}%</span>
+-                            <span className="legend-value mono">{money(c.total)}</span>
++                            <span className="legend-value mono">{format(c.total)}</span>
+                         </li>
+                     ))}
+                 </ul>
+diff --git a/frontend/src/components/Contact.jsx b/frontend/src/components/Contact.jsx
+index d748d79..52ab8a5 100644
+--- a/frontend/src/components/Contact.jsx
++++ b/frontend/src/components/Contact.jsx
+@@ -1,18 +1,122 @@
++import { useState } from "react";
++import { FiAlertCircle, FiCheckCircle, FiSend } from "react-icons/fi";
++import { sendContactMessage } from "../services/contactService";
++
++// The form was inert: no state, no submit handler, no `name` attributes, so
++// pressing Send Message reloaded the page with the fields in the URL and threw
++// the message away. It now posts to POST /api/contact, which stores the row and
++// emails a notification.
++//
++// The look is unchanged on purpose - same three fields, same placeholders, same
++// full-width button - because that is the design that was signed off. What is
++// added is everything a form needs but had none of:
++//
++//   * labels. Every field had a placeholder and nothing else, which is not a
++//     label: it disappears the moment you type, so anyone who looks away loses
++//     which box they are in, and a screen reader announces three unnamed inputs.
++//     They are `.sr-only` here rather than visible, so the rendered design does
++//     not move.
++//   * `name`, `autoComplete` and `type`, so a browser can fill the first two.
++//   * a busy state, so a slow network cannot send the same message five times.
++//   * somewhere for the answer to appear. A form that silently succeeds is
++//     indistinguishable from a form that silently fails.
++const EMPTY = { name: "", email: "", message: "" };
++
+ const Contact = () => {
+-  return (
+-    <section id="contact" className="contact">
+-      <h2>Contact Us</h2>
+-      <p>Have questions? We'd love to hear from you.</p>
+-
+-      <form className="contact-form">
+-        <input type="text" placeholder="Your Name" />
+-        <input type="email" placeholder="Your Email" />
+-        <textarea placeholder="Your Message"></textarea>
+-
+-        <button type="submit">Send Message</button>
+-      </form>
+-    </section>
+-  );
++    const [form, setForm] = useState(EMPTY);
++    const [busy, setBusy] = useState(false);
++    const [ok, setOk] = useState("");
++    const [error, setError] = useState("");
++
++    const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
++
++    const submit = async (e) => {
++        e.preventDefault();
++        if (busy) return;
++        setBusy(true);
++        setError("");
++        setOk("");
++        try {
++            const res = await sendContactMessage(form);
++            // Cleared only on success. On a failure the words somebody typed are
++            // still in the boxes, which is the difference between "try again" and
++            // "type it all again".
++            setForm(EMPTY);
++            setOk(res.message || "Thanks — your message has reached us.");
++        } catch (err) {
++            setError(err.message || "Could not send your message. Please try again.");
++        } finally {
++            setBusy(false);
++        }
++    };
++
++    return (
++        <section id="contact" className="contact">
++            <h2>Contact Us</h2>
++            <p>Have questions? We&apos;d love to hear from you.</p>
++
++            <form className="contact-form" onSubmit={submit} noValidate>
++                {/* role="alert" so the reply is announced, and aria-live means a
++                    sighted keyboard user who has already tabbed past sees it
++                    too. Rendered above the fields: below the button it would be
++                    off-screen on a phone at the moment it appears. */}
++                {error && (
++                    <p className="contact-note contact-note-bad" role="alert">
++                        <FiAlertCircle aria-hidden="true" /> {error}
++                    </p>
++                )}
++                {ok && (
++                    <p className="contact-note contact-note-ok" role="status">
++                        <FiCheckCircle aria-hidden="true" /> {ok}
++                    </p>
++                )}
++
++                <label className="sr-only" htmlFor="contact-name">Your name</label>
++                <input
++                    id="contact-name"
++                    name="name"
++                    type="text"
++                    placeholder="Your Name"
++                    autoComplete="name"
++                    maxLength={100}
++                    required
++                    value={form.name}
++                    onChange={set("name")}
++                    disabled={busy}
++                />
++
++                <label className="sr-only" htmlFor="contact-email">Your email</label>
++                <input
++                    id="contact-email"
++                    name="email"
++                    type="email"
++                    placeholder="Your Email"
++                    autoComplete="email"
++                    maxLength={150}
++                    required
++                    value={form.email}
++                    onChange={set("email")}
++                    disabled={busy}
++                />
++
++                <label className="sr-only" htmlFor="contact-message">Your message</label>
++                <textarea
++                    id="contact-message"
++                    name="message"
++                    placeholder="Your Message"
++                    maxLength={2000}
++                    required
++                    value={form.message}
++                    onChange={set("message")}
++                    disabled={busy}
++                ></textarea>
++
++                <button type="submit" disabled={busy}>
++                    {busy ? "Sending..." : <><FiSend aria-hidden="true" /> Send Message</>}
++                </button>
++            </form>
++        </section>
++    );
+ };
+ 
+-export default Contact;
+\ No newline at end of file
++export default Contact;
+diff --git a/frontend/src/components/ExpenseTable.jsx b/frontend/src/components/ExpenseTable.jsx
+index e01b049..b7f2f1b 100644
+--- a/frontend/src/components/ExpenseTable.jsx
++++ b/frontend/src/components/ExpenseTable.jsx
+@@ -5,9 +5,14 @@ import { money, prettyDate } from "../services/format";
+ // `showOwner` turns this into the admin's all-expenses table; without it, it is
+ // the owner's own list. One component means the two views cannot drift apart
+ // in formatting the way the original duplicated pages did.
++// `format` and `dateFormat` default to the exact/long helpers, so a caller that
++// passes neither renders exactly as before. The user dashboard passes
++// display.amount and display.date, which is what carries the estimate switch and
++// the date-format choice into this table.
+ const ExpenseTable = ({
+     expenses, onEdit, onDelete, showOwner = false,
+     emptyText = "Nothing here yet.",
++    format = money, dateFormat = prettyDate,
+ }) => {
+     // Inline confirmation instead of window.confirm(): a native dialog blocks
+     // the whole page, cannot be styled, and is awkward to drive in tests.
+@@ -38,7 +43,7 @@ const ExpenseTable = ({
+ 
+                         return (
+                             <tr key={e.id}>
+-                                <td className="nowrap">{prettyDate(e.expense_date)}</td>
++                                <td className="nowrap">{dateFormat(e.expense_date)}</td>
+ 
+                                 {showOwner && (
+                                     <td>
+@@ -63,7 +68,7 @@ const ExpenseTable = ({
+ 
+                                 <td><span className="cat-chip">{e.category}</span></td>
+ 
+-                                <td className="right mono">{money(e.amount)}</td>
++                                <td className="right mono">{format(e.amount)}</td>
+ 
+                                 {hasActions && (
+                                     <td className="right">
+diff --git a/frontend/src/components/MonthlyTrend.jsx b/frontend/src/components/MonthlyTrend.jsx
+index 8edada0..36ef35b 100644
+--- a/frontend/src/components/MonthlyTrend.jsx
++++ b/frontend/src/components/MonthlyTrend.jsx
+@@ -6,7 +6,10 @@ import { moneyShort, monthLabel, money } from "../services/format";
+ //
+ // `months` arrives newest-first from the API (that is what the LIMIT needs),
+ // so it is reversed here to read left-to-right like a calendar.
+-const MonthlyTrend = ({ months, title = "Spend over time" }) => {
++// `format` defaults to money(), so a caller that does not pass one behaves
++// exactly as before. The user dashboard passes display.amount, which is what
++// makes Settings > Display > "estimated amounts" reach this chart.
++const MonthlyTrend = ({ months, title = "Spend over time", format = money }) => {
+     const data = [...months].reverse();
+ 
+     if (!data.length) {
+@@ -26,7 +29,7 @@ const MonthlyTrend = ({ months, title = "Spend over time" }) => {
+             <div className="panel-head">
+                 <h3>{title}</h3>
+                 <span className="panel-note">
+-                    Peak {monthLabel(highest.month)} · {money(highest.total)}
++                    Peak {monthLabel(highest.month)} · {format(highest.total)}
+                 </span>
+             </div>
+ 
+@@ -43,7 +46,7 @@ const MonthlyTrend = ({ months, title = "Spend over time" }) => {
+                                 <div
+                                     className="trend-bar trend-bar-solid"
+                                     style={{ height: `${height}%` }}
+-                                    title={`${monthLabel(m.month)}: ${money(m.total)} across ${m.count} ${
++                                    title={`${monthLabel(m.month)}: ${format(m.total)} across ${m.count} ${
+                                         m.count === 1 ? "entry" : "entries"
+                                     }`}
+                                 />
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 174c388..659b102 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -8,8 +8,20 @@
+   /* ink */
+   --ink:        #0f172a;
+   --ink-soft:   #334155;
+-  --muted:      #64748b;
+-  --muted-soft: #94a3b8;
++  /* Was #64748b: 4.76:1 on pure white but 4.49 on --page, 4.19 on --page-alt and
++     4.20 on --accent-wash, so it failed AA everywhere it sits on a tint - table
++     headers, .adm-head p, .dash-sub, .adm-note. Same hue and chroma, lightness
++     dropped in OKLCH until the worst ground clears 4.55. */
++  --muted:      #5e6e85;
++  /* Was #94a3b8 = 2.56:1 on white, 2.26 on --page-alt: a full rank below AA and
++     used for real text (hints, chart axis labels, zero cells, placeholders), not
++     just decoration.
++     WORTH KNOWING: to clear 4.5 on a tinted surface this has to come down to
++     almost exactly --muted, so the fourth ink rank no longer reads lighter than
++     the third. The palette has no readable lighter step on these grounds. The
++     alternative is to stop using rank 4 for text and move those ~16 call sites
++     to --muted, which is a bigger change than one token. */
++  --muted-soft: #606e82;
+ 
+   /* accent */
+   --accent:       #4f46e5;
+@@ -252,3 +264,19 @@
+ html {
+     scroll-behavior: smooth;
+ }
++
++/* Visible to a screen reader, not to the eye. Needed because several forms in
++   this app label their fields with a placeholder only - the contact form had
++   three inputs with no accessible name at all - and a placeholder is not a
++   label: it vanishes the moment you type. `clip-path` plus a 1px box rather
++   than `display: none`, which removes the element from the accessibility tree
++   as well, or a negative text-indent, which some screen readers skip. */
++.sr-only {
++  position: absolute;
++  width: 1px; height: 1px;
++  padding: 0; margin: -1px;
++  overflow: hidden;
++  clip-path: inset(50%);
++  white-space: nowrap;
++  border: 0;
++}
+diff --git a/frontend/src/pages/UserDashboard.jsx b/frontend/src/pages/UserDashboard.jsx
+index 03bc20c..fbec2cf 100644
+--- a/frontend/src/pages/UserDashboard.jsx
++++ b/frontend/src/pages/UserDashboard.jsx
+@@ -9,7 +9,8 @@ import CategoryDonut from "../components/CategoryDonut";
+ import ExpenseTable from "../components/ExpenseTable";
+ import ExpenseDrawer from "../components/ExpenseDrawer";
+ import { useAuth } from "../context/useAuth";
+-import { money, currentMonthKey, percent, movementWords } from "../services/format";
++import { currentMonthKey, percent, movementWords } from "../services/format";
++import { useDisplay } from "../context/useDisplay";
+ import * as svc from "../services/expenseService";
+ 
+ const loadAll = () =>
+@@ -69,6 +70,7 @@ const rangeFor = (id) => {
+ 
+ const UserDashboard = () => {
+     const { user } = useAuth();
++    const display = useDisplay();
+     const [state, setState] = useState({ data: null, error: "", loading: true });
+     const alive = useRef(true);
+ 
+@@ -100,7 +102,10 @@ const UserDashboard = () => {
+     const [drawerOpen, setDrawerOpen] = useState(false);
+     const [editing, setEditing] = useState(null);
+     const [categoryFilter, setCategoryFilter] = useState("All");
+-    const [period, setPeriod] = useState("all");
++    // Seeded from Settings > Display > "Default period", the same way every
++    // admin page seeds its own picker. It was hardcoded to "all", which made that
++    // preference a control with nothing behind it on this side.
++    const [period, setPeriod] = useState(display.defaultPeriod);
+ 
+     // Memoised so the `?? []` fallback is a stable reference - without this,
+     // every render creates a fresh empty array and the period useMemo below
+@@ -167,7 +172,12 @@ const UserDashboard = () => {
+     return (
+         <DashboardLayout
+             title={`Hi ${firstName(user?.name)}`}
+-            subtitle="Track what you spend. Every figure here is exact, to the rupee."
++            // "exact, to the rupee" is a promise this page can no longer make
++            // unconditionally: with estimated amounts on, every figure on it is
++            // rounded. The line now says which of the two you are looking at.
++            subtitle={display.estimated
++                ? "Track what you spend. Figures are rounded — switch estimates off in Settings for exact amounts."
++                : "Track what you spend. Every figure here is exact, to the rupee."}
+             actions={
+                 <button className="btn btn-primary btn-lg" onClick={openNew}>
+                     <FiPlus aria-hidden="true" /> New expense
+@@ -185,14 +195,14 @@ const UserDashboard = () => {
+                     items={[
+                         {
+                             label: "This month",
+-                            value: money(thisMonth?.total || 0),
++                            value: display.amount(thisMonth?.total || 0),
+                             sub: trendNote,
+                             Icon: FiCalendar,
+                             tone: "accent",
+                         },
+                         {
+                             label: "Total spent",
+-                            value: money(totals.total_amount),
++                            value: display.amount(totals.total_amount),
+                             sub: `${totals.total_count} ${
+                                 totals.total_count === 1 ? "entry" : "entries"
+                             } all time`,
+@@ -200,15 +210,15 @@ const UserDashboard = () => {
+                         },
+                         {
+                             label: "Average entry",
+-                            value: money(totals.average_amount),
+-                            sub: `Largest ${money(totals.largest_amount)}`,
++                            value: display.amount(totals.average_amount),
++                            sub: `Largest ${display.amount(totals.largest_amount)}`,
+                             Icon: FiBarChart2,
+                         },
+                         {
+                             label: "Top category",
+                             value: topCategory ? topCategory.category : "—",
+                             sub: topCategory
+-                                ? `${money(topCategory.total)} · ${percent(
++                                ? `${display.amount(topCategory.total)} · ${percent(
+                                       topCategory.total,
+                                       totals.total_amount
+                                   )}% of your spend`
+@@ -221,8 +231,8 @@ const UserDashboard = () => {
+             )}
+ 
+             <div className="grid-2">
+-                <MonthlyTrend months={months} title="Your spend over time" />
+-                <CategoryDonut categories={categories} title="Where your money goes" />
++                <MonthlyTrend months={months} title="Your spend over time" format={display.amount} />
++                <CategoryDonut categories={categories} title="Where your money goes" format={display.amount} />
+             </div>
+ 
+             <section className="panel">
+@@ -255,7 +265,7 @@ const UserDashboard = () => {
+                         </label>
+ 
+                         <span className="period-note" aria-live="polite">
+-                            <strong>{activePeriod.label}:</strong> {money(periodTotal)} ·{" "}
++                            <strong>{activePeriod.label}:</strong> {display.amount(periodTotal)} ·{" "}
+                             {inPeriod.length} {inPeriod.length === 1 ? "entry" : "entries"}
+                         </span>
+                     </div>
+@@ -268,6 +278,8 @@ const UserDashboard = () => {
+                         expenses={visible}
+                         onEdit={openEdit}
+                         onDelete={handleDelete}
++                        format={display.amount}
++                        dateFormat={display.date}
+                         emptyText={
+                             expenses.length === 0
+                                 ? "No expenses yet. Use New expense to add your first one."
+diff --git a/frontend/src/pages/UserSettings.jsx b/frontend/src/pages/UserSettings.jsx
+new file mode 100644
+index 0000000..9103fb7
+--- /dev/null
++++ b/frontend/src/pages/UserSettings.jsx
+@@ -0,0 +1,359 @@
++import { useState } from "react";
++import {
++    FiUser, FiSliders, FiDatabase, FiDownload,
++    FiAlertCircle, FiCheckCircle, FiInfo,
++} from "react-icons/fi";
++import DashboardLayout from "../Layouts/DashboardLayout";
++import { useAuth } from "../context/useAuth";
++import { useDisplay } from "../context/useDisplay";
++import { PERIODS } from "../services/period";
++import { money, moneyApprox } from "../services/format";
++import * as profile from "../services/profileService";
++import { downloadMyExpensesCsv } from "../services/expenseService";
++
++// The user-side counterpart of AdminSettings, on the same three mechanisms:
++// profileService for the account, DisplayContext for the preferences, and a CSV
++// endpoint for the export.
++//
++// WHAT IS DIFFERENT FROM THE ADMIN PAGE, and why:
++//
++//   * Three tabs, not four. The admin's "Administrators" tab lists everyone with
++//     full access and can add one; both call /api/admin/people, which is behind
++//     requireRole("admin"). A user hitting it gets a 403, so the tab would be a
++//     permanent error panel. It is dropped rather than shown empty.
++//
++//   * Export goes to /api/expenses/export, not /api/admin/expenses/export. The
++//     admin route returns EVERY user's rows. The user route is scoped server-side
++//     from the token, so it can only ever return your own - the scoping is not a
++//     filter the client asks for and could forget.
++//
++//   * The Display switches are wired into the user dashboard in this same change.
++//     Before it they were read by admin pages only, so shipping them here first
++//     would have meant four controls that visibly change nothing.
++//
++// Danger zone: still not built, for the same reason it is not built on the admin
++// page. Deleting your account deletes every expense you recorded and there is no
++// undo, so it needs a confirmation flow and a deliberate decision rather than a
++// button added quietly. Said out loud on the page instead of hidden.
++const SAMPLE = 1104567;
++
++// "System" first: it is the default and the one that needs no decision.
++const THEMES = [
++    { id: "system", label: "System" },
++    { id: "light",  label: "Light" },
++    { id: "dark",   label: "Dark" },
++];
++
++const TABS = [
++    { id: "account", label: "My account", Icon: FiUser },
++    { id: "display", label: "Display",    Icon: FiSliders },
++    { id: "data",    label: "My data",    Icon: FiDatabase },
++];
++
++const UserSettings = () => {
++    const { user, refresh } = useAuth();
++    const display = useDisplay();
++
++    const [tab, setTab] = useState("account");
++    // Seeded from the signed-in user once. Re-syncing it in an effect would fight
++    // the user's typing and trips this repo's react-hooks/set-state-in-effect
++    // rule; the <form key> below remounts it if the account itself changes.
++    const [form, setForm] = useState(() => ({ name: user?.name || "", email: user?.email || "" }));
++    const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirm: "" });
++    const [busy, setBusy] = useState(false);
++    const [notice, setNotice] = useState("");
++    const [error, setError] = useState("");
++
++    const flash = (message) => {
++        setNotice(message);
++        setError("");
++    };
++
++    const saveProfile = async (e) => {
++        e.preventDefault();
++        setBusy(true);
++        setError("");
++        try {
++            await profile.updateProfile(form);
++            // The greeting and the drawer both read the name from the auth
++            // context, so it has to be re-read or they keep showing the old one.
++            if (refresh) await refresh();
++            flash("Your account was updated");
++        } catch (err) {
++            setError(err.message);
++        } finally {
++            setBusy(false);
++        }
++    };
++
++    const savePassword = async (e) => {
++        e.preventDefault();
++        setError("");
++        if (pw.newPassword !== pw.confirm) {
++            setError("The two new passwords do not match");
++            return;
++        }
++        setBusy(true);
++        try {
++            await profile.changePassword(pw);
++            setPw({ currentPassword: "", newPassword: "", confirm: "" });
++            flash("Your password was changed");
++        } catch (err) {
++            setError(err.message);
++        } finally {
++            setBusy(false);
++        }
++    };
++
++    const exportCsv = async () => {
++        setBusy(true);
++        setError("");
++        try {
++            await downloadMyExpensesCsv();
++            flash("Your export has been downloaded");
++        } catch (err) {
++            setError(err.message || "Could not build the export");
++        } finally {
++            setBusy(false);
++        }
++    };
++
++    return (
++        <DashboardLayout
++            title="Settings"
++            subtitle="Your account, how your figures are shown, and a copy of your data."
++            tabs={TABS}
++            activeTab={tab}
++            onTabChange={(id) => { setTab(id); setNotice(""); setError(""); }}
++        >
++            {error && (
++                <div className="alert alert-error" role="alert">
++                    <FiAlertCircle aria-hidden="true" /> {error}
++                </div>
++            )}
++            {notice && (
++                <div className="alert alert-ok" role="status">
++                    <FiCheckCircle aria-hidden="true" /> {notice}
++                </div>
++            )}
++
++            {tab === "account" && (
++                <div className="grid-2">
++                    <form className="panel dash-set-form" key={user?.id} onSubmit={saveProfile}>
++                        <div className="panel-head">
++                            <h3>My account</h3>
++                            <span className="dash-hint">Only affects your own login</span>
++                        </div>
++                        <div className="form-row">
++                            <label htmlFor="us-name">
++                                Full name
++                                <input id="us-name" name="name" value={form.name} required
++                                       onChange={(e) => setForm({ ...form, name: e.target.value })} />
++                            </label>
++                            <label htmlFor="us-email">
++                                Email
++                                <input id="us-email" name="email" type="email" value={form.email} required
++                                       onChange={(e) => setForm({ ...form, email: e.target.value })} />
++                            </label>
++                        </div>
++                        <p className="dash-note">
++                            <FiInfo aria-hidden="true" />
++                            Your email is also your login, so changing it changes how you sign in.
++                            Your expenses stay with the account either way.
++                        </p>
++                        <div className="form-actions">
++                            <button type="submit" className="btn btn-primary" disabled={busy}>
++                                {busy ? "Saving..." : "Save changes"}
++                            </button>
++                        </div>
++                    </form>
++
++                    <form className="panel dash-set-form" onSubmit={savePassword}>
++                        <div className="panel-head"><h3>Change password</h3></div>
++                        <label htmlFor="us-cur">
++                            Current password
++                            <input id="us-cur" type="password" required autoComplete="current-password"
++                                   value={pw.currentPassword}
++                                   onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} />
++                        </label>
++                        <div className="form-row">
++                            <label htmlFor="us-new">
++                                New password
++                                <input id="us-new" type="password" required minLength={8}
++                                       autoComplete="new-password" value={pw.newPassword}
++                                       onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} />
++                            </label>
++                            <label htmlFor="us-conf">
++                                Confirm new password
++                                <input id="us-conf" type="password" required autoComplete="new-password"
++                                       value={pw.confirm}
++                                       onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
++                            </label>
++                        </div>
++                        <p className="dash-hint">At least 8 characters. Stored as a bcrypt hash.</p>
++                        <div className="form-actions">
++                            <button type="submit" className="btn btn-primary" disabled={busy}>
++                                {busy ? "Saving..." : "Change password"}
++                            </button>
++                        </div>
++                    </form>
++                </div>
++            )}
++
++            {tab === "display" && (
++                <div className="panel">
++                    <div className="panel-head">
++                        <h3>Display</h3>
++                        <span className="dash-hint">Saved in this browser</span>
++                    </div>
++
++                    {/* Theme first: it is what someone opens this tab looking for,
++                        and the only preference that changes the page while they
++                        are still on it. */}
++                    <div className="dash-set-row">
++                        <span className="dash-set-txt">
++                            <b>Theme</b>
++                            <small>
++                                {display.theme === "system"
++                                    ? `Following this device, which is currently ${display.resolvedTheme}.`
++                                    : "Applies to your dashboard and the public pages."}
++                            </small>
++                        </span>
++                        <span className="dash-pick" role="group" aria-label="Theme">
++                            {THEMES.map(({ id, label }) => (
++                                <button key={id} type="button"
++                                        aria-pressed={display.theme === id}
++                                        className={display.theme === id ? "dash-pick-on" : ""}
++                                        onClick={() => display.set({ theme: id })}>
++                                    {label}
++                                </button>
++                            ))}
++                        </span>
++                    </div>
++
++                    <div className="dash-set-row">
++                        <span className="dash-set-txt">
++                            <b>Show estimated amounts</b>
++                            <small>
++                                {moneyApprox(SAMPLE)} instead of {money(SAMPLE)}.
++                                Applies to your cards, charts and tables.
++                            </small>
++                        </span>
++                        <button
++                            type="button"
++                            role="switch"
++                            aria-checked={display.estimated}
++                            aria-label="Show estimated amounts"
++                            className={`dash-switch${display.estimated ? " dash-switch-on" : ""}`}
++                            onClick={() => display.set({ estimated: !display.estimated })}
++                        >
++                            <i />
++                        </button>
++                    </div>
++
++                    <div className="dash-set-row">
++                        <span className="dash-set-txt">
++                            <b>Date format</b>
++                            <small>How your expense dates are written.</small>
++                        </span>
++                        <span className="dash-pick" role="group" aria-label="Date format">
++                            <button type="button"
++                                    aria-pressed={display.dateStyle === "long"}
++                                    className={display.dateStyle === "long" ? "dash-pick-on" : ""}
++                                    onClick={() => display.set({ dateStyle: "long" })}>07 Aug 2026</button>
++                            <button type="button"
++                                    aria-pressed={display.dateStyle === "iso"}
++                                    className={display.dateStyle === "iso" ? "dash-pick-on" : ""}
++                                    onClick={() => display.set({ dateStyle: "iso" })}>2026-08-07</button>
++                        </span>
++                    </div>
++
++                    <div className="dash-set-row">
++                        <span className="dash-set-txt">
++                            <b>Default period</b>
++                            <small>Which period your dashboard opens on.</small>
++                        </span>
++                        <label className="select-inline">
++                            <select value={display.defaultPeriod}
++                                    aria-label="Default period"
++                                    onChange={(e) => display.set({ defaultPeriod: e.target.value })}>
++                                {PERIODS.map((p) => (
++                                    <option key={p.id} value={p.id}>{p.label}</option>
++                                ))}
++                            </select>
++                        </label>
++                    </div>
++
++                    <p className="dash-note">
++                        <FiInfo aria-hidden="true" />
++                        Estimated amounts round to the nearest thousand, lakh or crore, so individual
++                        rows will not add up to the total exactly. Turn the switch off when a figure
++                        has to be checked against a receipt — the export is always exact regardless
++                        of this setting.
++                    </p>
++                </div>
++            )}
++
++            {tab === "data" && (
++                <div className="grid-2">
++                    <div className="panel">
++                        <div className="panel-head"><h3>Export</h3></div>
++                        <div className="dash-set-row">
++                            <span className="dash-set-txt">
++                                <b>Download my expenses</b>
++                                <small>
++                                    A CSV of your own entries — date, title, category, amount and
++                                    notes. Amounts are exact even with estimates switched on. Covers
++                                    your 500 most recent entries, which is the server&apos;s own limit
++                                    on a single listing.
++                                </small>
++                            </span>
++                            <button type="button" className="btn btn-ghost" onClick={exportCsv} disabled={busy}>
++                                <FiDownload aria-hidden="true" /> {busy ? "Preparing..." : "Export"}
++                            </button>
++                        </div>
++                        <p className="dash-note">
++                            <FiInfo aria-hidden="true" />
++                            The file contains only your expenses. Nobody else&apos;s rows can appear
++                            in it — the server builds it from your login, not from anything this page
++                            sends.
++                        </p>
++                    </div>
++
++                    <div className="panel dash-danger">
++                        <div className="panel-head"><h3>Danger zone</h3></div>
++                        <p className="dash-hint" style={{ marginTop: 0 }}>
++                            Not built yet, and deliberately so. Deleting your account also deletes
++                            every expense you have recorded, and there is no undo — that needs a
++                            confirmation flow and a decision from whoever owns the data, not a button
++                            added quietly.
++                        </p>
++                        <div className="dash-set-row">
++                            <span className="dash-set-txt">
++                                <b>Delete my account</b>
++                                <small>Would remove your login and all of your expenses.</small>
++                            </span>
++                            <button type="button" className="btn btn-danger" disabled>
++                                Not available
++                            </button>
++                        </div>
++                        <div className="dash-set-row">
++                            <span className="dash-set-txt">
++                                <b>Clear all my expenses</b>
++                                <small>
++                                    Delete them one at a time from your dashboard for now — each row
++                                    has its own Delete.
++                                </small>
++                            </span>
++                            <button type="button" className="btn btn-danger" disabled>
++                                Not available
++                            </button>
++                        </div>
++                    </div>
++                </div>
++            )}
++        </DashboardLayout>
++    );
++};
++
++export default UserSettings;
+diff --git a/frontend/src/services/contactService.js b/frontend/src/services/contactService.js
+new file mode 100644
+index 0000000..eee2c8b
+--- /dev/null
++++ b/frontend/src/services/contactService.js
+@@ -0,0 +1,14 @@
++import api from "./api";
++
++// The one call the public contact form makes. It goes through the same axios
++// instance as everything else so it inherits the base URL and, more importantly,
++// the response interceptor that turns an axios error into a plain Error with the
++// server's own message on it - which is what the form displays.
++//
++// The request interceptor attaches a bearer token when one is stored. Harmless
++// here: the endpoint ignores it, and a signed-in person filling in the contact
++// form is a perfectly ordinary thing to do.
++export const sendContactMessage = async ({ name, email, message }) => {
++    const { data } = await api.post("/contact", { name, email, message });
++    return data;
++};
+diff --git a/frontend/src/services/expenseService.js b/frontend/src/services/expenseService.js
+index 07ba433..53a3756 100644
+--- a/frontend/src/services/expenseService.js
++++ b/frontend/src/services/expenseService.js
+@@ -24,3 +24,19 @@ export const deleteExpense = async (id) => {
+     const { data } = await api.delete(`/expenses/${id}`);
+     return data.id;
+ };
++
++// CSV export of your own expenses. Goes through axios rather than a plain
++// <a href> so the Authorization header is attached - the endpoint is behind
++// auth, so an anchor would come back 401. Same shape as the admin export in
++// adminService.js, pointed at the user-scoped route.
++export const downloadMyExpensesCsv = async () => {
++    const { data } = await api.get("/expenses/export", { responseType: "blob" });
++    const url = URL.createObjectURL(new Blob([data], { type: "text/csv" }));
++    const a = document.createElement("a");
++    a.href = url;
++    a.download = "my-expenses.csv";
++    document.body.appendChild(a);
++    a.click();
++    a.remove();
++    URL.revokeObjectURL(url);
++};
+diff --git a/frontend/src/styles/Admin.css b/frontend/src/styles/Admin.css
+index b2f1642..f5c5d65 100644
+--- a/frontend/src/styles/Admin.css
++++ b/frontend/src/styles/Admin.css
+@@ -1302,7 +1302,10 @@
+         grid-template-columns: minmax(0, 1fr);
+         gap: 4px;
+     }
+-    .adm-side-panel .adm-nav-link { padding: 12px; }
++    /* 12px of padding around 13.5px text comes to 41px, which is under the
++       44px floor every other control in this drawer clears. Measured at 41px on
++       all six admin pages with the drawer open. */
++    .adm-side-panel .adm-nav-link { padding: 12px; min-height: 44px; }
+ 
+     /* The row styling now lives in the base rule; the drawer only widens the
+        padding to match its own gutters. */
+@@ -1372,7 +1375,13 @@
+     .adm-tab,
+     .adm-select,
+     .adm-logout,
+-    .adm-drop { min-height: 44px; }
++    .adm-drop,
++    /* The search box (43px) and the settings fields (38px) were missing from
++       this list. The font-size bump above stops iOS zooming when they are
++       focused, but it does not make them big enough to hit - and the search box
++       is the first thing touched on the Users and All expenses pages. */
++    .adm-search input,
++    .adm-fld input { min-height: 44px; }
+ 
+     /* Same 44px floor the nav toggle already gets - 40px is fine under a mouse
+        and not under a thumb. Height only: the control is a full-width row now,
+diff --git a/frontend/src/styles/Dashboard.css b/frontend/src/styles/Dashboard.css
+index e4ef67b..a805a12 100644
+--- a/frontend/src/styles/Dashboard.css
++++ b/frontend/src/styles/Dashboard.css
+@@ -311,7 +311,12 @@
+ 
+ .dash .grid-2 {
+     display: grid;
+-    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
++    /* `min(330px, 100%)`, not a bare 330px: with auto-fit a track whose minimum
++       exceeds the container still takes its minimum, so at 360px - a 328px
++       content box - the grid rendered 330px wide and overflowed by exactly 2px.
++       The min() clamps the floor to the container when it is narrower. No effect
++       at any width where 330px already fits. */
++    grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
+     gap: 20px;
+     align-items: start;
+ }
+@@ -938,8 +943,24 @@
+        without moving the text or changing the visual rhythm. */
+     .dash .btn,
+     .dash .dash-nav a,
++    .dash .dash-nav-link,
++    .dash .dash-brand,
++    .dash .dash-tab,
+     .dash .dash-logout { min-height: 44px; }
+ 
++    /* `.dash-nav a` never matched the brand: `.dash-brand` is a SIBLING of
++       `.dash-nav`, not a link inside it. So the brand link stayed at 34px - the
++       exact defect the comment above this block lists as fixed. Named directly
++       now. `.dash-tab` (33px) and `.dash-nav-link` were never listed at all.
++
++       Text inputs and textareas get the same floor: the font-size rule above
++       stops iOS zooming on focus, which is a different problem from the box
++       being too small to hit. Checkboxes and radios are excluded because a 44px
++       checkbox is a 44px square of ink, not a bigger target - their label
++       carries the tap area. */
++    .dash input:not([type="checkbox"]):not([type="radio"]),
++    .dash textarea { min-height: 44px; }
++
+     /* `.btn-tiny` is the row-level Edit/Delete pair. It keeps its
+        small type - only the box grows. */
+     .dash .btn-tiny { min-height: 44px; padding: 6px 14px; }
+@@ -1060,16 +1081,38 @@
+ 
+     /* The name reads in full in here. It is hidden in the bar at this width
+        only because the bar had no room for it - the drawer does. */
++    /* Grid, not a flex column, and named areas rather than an extra wrapper
++       div: the pip spans both text rows on the left exactly as `.adm-me` does,
++       and the DOM stays flat so the desktop bar needs no `display: contents`
++       escape hatch. `minmax(0, 1fr)` on the text column so a long name
++       ellipsises inside the drawer instead of widening it. */
+     .dash .dash-side-panel .dash-user-meta {
+-        flex-direction: column;
+-        align-items: flex-start;
+-        gap: 8px;
++        display: grid;
++        grid-template-columns: auto minmax(0, 1fr);
++        grid-template-areas:
++            "pip name"
++            "pip role";
++        align-items: center;
++        column-gap: 11px;
++        row-gap: 4px;
+         padding-bottom: 14px;
+         border-bottom: 1px solid var(--border-strong);
+     }
++    .dash .dash-side-panel .dash-avatar {
++        grid-area: pip;
++        display: grid;
++    }
+     .dash .dash-side-panel .dash-user-meta strong {
++        grid-area: name;
+         display: block;
+         font-size: 15px;
++        overflow: hidden;
++        text-overflow: ellipsis;
++        white-space: nowrap;
++    }
++    .dash .dash-side-panel .dash-user-meta .role-chip {
++        grid-area: role;
++        justify-self: start;
+     }
+ 
+     /* An icon-plus-label row, not a 38px square: the square exists because the
+@@ -1148,3 +1191,235 @@
+     .dash .dash-theme-label,
+     .dash .dash-scrim { display: none; }
+ }
++
++/* ============================================================
++   PAGE LINKS IN THE BAR AND THE DRAWER
++   ------------------------------------------------------------
++   Two links today (Dashboard, Settings). They sit inside
++   `.dash-user`, so above 720px they are part of the top bar's
++   right-hand group and below it they are the first block in the
++   drawer - one DOM, no duplicate markup per breakpoint.
++   ============================================================ */
++.dash .dash-nav {
++    display: flex;
++    align-items: center;
++    gap: 4px;
++}
++.dash .dash-nav-link {
++    display: inline-flex;
++    align-items: center;
++    gap: 7px;
++    padding: 8px 12px;
++    border-radius: var(--r-sm);
++    font-size: 13px;
++    font-weight: 650;
++    color: var(--muted);
++    text-decoration: none;
++    white-space: nowrap;
++}
++.dash .dash-nav-link svg { width: 15px; height: 15px; flex: none; }
++.dash .dash-nav-link:hover { background: var(--page-alt); color: var(--ink); }
++/* The current page reads as filled rather than merely coloured: colour alone is
++   not a state, and `aria-current` is doing the same job for a screen reader. */
++.dash .dash-nav-on,
++.dash .dash-nav-on:hover {
++    background: var(--accent-wash);
++    color: var(--accent);
++    box-shadow: inset 0 0 0 1px var(--accent-line);
++}
++
++/* The two pieces that make this drawer read as the admin sidebar's counterpart
++   rather than a top bar folded into a panel: a group heading over the links
++   (`.adm-nav-label`) and an initials pip beside the name (`.adm-avatar`).
++
++   Both are DRAWER-ONLY - `display: none` here, switched on in the 720px block.
++   They are one DOM either way, so the desktop bar is untouched: an "OVERVIEW"
++   heading and a 38px pip in a 64px-tall bar would be clutter, and the bar
++   already hides the name at that width for room. Verified 0 differing pixels
++   across the user dashboard and settings pages at 1440, 1200 and 900px. */
++.dash .dash-nav-label {
++    display: none;
++    font-size: 10px;
++    font-weight: 800;
++    letter-spacing: .12em;
++    text-transform: uppercase;
++    color: var(--muted);
++    padding: 0 12px;
++    margin: 2px 0 8px;
++}
++.dash .dash-avatar {
++    display: none;
++    width: 38px;
++    height: 38px;
++    border-radius: var(--r-pill);
++    place-items: center;
++    background: var(--accent);
++    color: var(--on-accent);
++    font-size: 13.5px;
++    font-weight: 800;
++    letter-spacing: .02em;
++    flex: none;
++}
++
++/* ============================================================
++   SETTINGS ROWS, PICKERS AND SWITCHES
++   ------------------------------------------------------------
++   The user counterparts of `.adm-set-row`, `.adm-pick` and
++   `.adm-switch`. Same shapes, built on the user tokens, so the
++   two settings pages behave identically without `.dash` having
++   to import anything from `Admin.css`.
++   ============================================================ */
++.dash .dash-set-row {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    gap: 18px;
++    padding: 15px 0;
++    border-top: 1px solid var(--border);
++}
++.dash .dash-set-row:first-of-type { border-top: 0; }
++.dash .dash-set-txt { min-width: 0; }
++.dash .dash-set-txt b {
++    display: block;
++    font-size: 13.5px;
++    font-weight: 700;
++    color: var(--ink);
++}
++.dash .dash-set-txt small {
++    display: block;
++    margin-top: 3px;
++    font-size: 12.5px;
++    line-height: 1.5;
++    color: var(--muted);
++}
++
++.dash .dash-hint { font-size: 12px; color: var(--muted); }
++
++/* Segmented control. `inset` box-shadow rather than a border so the selected
++   button does not change size when it gains its outline - a 1px border on the
++   active item alone shifts every sibling by a pixel. */
++.dash .dash-pick {
++    display: inline-flex;
++    flex: none;
++    gap: 3px;
++    padding: 3px;
++    border-radius: var(--r-sm);
++    background: var(--page-alt);
++    box-shadow: inset 0 0 0 1px var(--border);
++}
++.dash .dash-pick button {
++    padding: 7px 12px;
++    min-height: 34px;
++    border: 0;
++    border-radius: calc(var(--r-sm) - 2px);
++    background: transparent;
++    font: inherit;
++    font-size: 12.5px;
++    font-weight: 650;
++    /* --ink-soft, not --muted: measured, --muted lands at 4.19:1 on the track's
++       --page-alt fill, under the 4.5 a 12.5px label needs. These are the
++       unselected options, not decoration - they have to be readable. */
++    color: var(--ink-soft);
++    cursor: pointer;
++    white-space: nowrap;
++}
++.dash .dash-pick button:hover { color: var(--ink); }
++.dash .dash-pick .dash-pick-on,
++.dash .dash-pick .dash-pick-on:hover {
++    background: var(--surface);
++    color: var(--accent);
++    box-shadow: 0 1px 2px var(--img-shadow);
++}
++
++/* A real <button role="switch">, not a checkbox: the state is announced by
++   aria-checked and the whole control is one tab stop. */
++.dash .dash-switch {
++    flex: none;
++    width: 46px;
++    height: 27px;
++    padding: 3px;
++    border: 0;
++    border-radius: 999px;
++    background: var(--border-strong);
++    cursor: pointer;
++    transition: background .16s ease;
++}
++.dash .dash-switch i {
++    display: block;
++    width: 21px;
++    height: 21px;
++    border-radius: 50%;
++    background: var(--surface);
++    box-shadow: 0 1px 3px var(--img-shadow);
++    transition: transform .16s ease;
++}
++.dash .dash-switch-on { background: var(--accent); }
++.dash .dash-switch-on i { transform: translateX(19px); }
++
++.dash .dash-note {
++    display: flex;
++    align-items: flex-start;
++    gap: 9px;
++    margin: 16px 0 0;
++    padding: 12px 14px;
++    border-radius: var(--r-sm);
++    background: var(--page-alt);
++    font-size: 12.5px;
++    line-height: 1.55;
++    color: var(--ink-soft);
++}
++.dash .dash-note svg { width: 15px; height: 15px; flex: none; margin-top: 1px; color: var(--muted); }
++
++.dash .btn-danger {
++    background: var(--bad-wash);
++    color: var(--bad);
++    border-color: var(--bad-line);
++}
++.dash .btn-danger:disabled { opacity: .6; cursor: not-allowed; }
++.dash .dash-danger { box-shadow: inset 0 0 0 1px var(--bad-line); }
++
++@media (prefers-reduced-motion: reduce) {
++    .dash .dash-switch,
++    .dash .dash-switch i { transition: none; }
++}
++
++/* Below 720px the links become a stacked menu at the top of the drawer, above
++   the identity block, with a rule under them - the reference layout the drawer
++   was built from. */
++@media (max-width: 720px) {
++    .dash .dash-side-panel .dash-nav {
++        flex-direction: column;
++        align-items: stretch;
++        gap: 2px;
++        padding-bottom: 12px;
++        margin-bottom: 12px;
++        border-bottom: 1px solid var(--border-strong);
++    }
++    .dash .dash-side-panel .dash-nav-link {
++        min-height: 44px;
++        padding: 0 12px;
++        font-size: 13.5px;
++    }
++    .dash .dash-side-panel .dash-nav-link svg { width: 17px; height: 17px; }
++    .dash .dash-side-panel .dash-nav-label { display: block; }
++
++    /* A settings row cannot stay a two-column row at 360px: the control ends up
++       beside a two-line label with about 90px to live in. */
++    .dash .dash-set-row {
++        flex-direction: column;
++        align-items: stretch;
++        gap: 12px;
++    }
++    .dash .dash-pick { align-self: stretch; }
++    .dash .dash-pick button { flex: 1; }
++    .dash .dash-set-row .dash-switch { align-self: flex-start; }
++}
++
++/* `.form-row` is `repeat(auto-fit, minmax(150px, 1fr))`, so it keeps two columns
++   down to a 312px content box - fine for the expense drawer's Title/Amount pair,
++   too tight on this page, where 150px cannot hold an email address or the words
++   "Confirm new password". Scoped to the settings forms so the drawer, which is
++   already signed off at these widths, is untouched. */
++@media (max-width: 620px) {
++    .dash .dash-set-form .form-row { grid-template-columns: minmax(0, 1fr); }
++}
+diff --git a/frontend/src/styles/Login.css b/frontend/src/styles/Login.css
+index 70b136f..6d11134 100644
+--- a/frontend/src/styles/Login.css
++++ b/frontend/src/styles/Login.css
+@@ -586,7 +586,14 @@
+     /* Two lines of brand text forced the bar to wrap to 138px - a sixth
+        of the screen spent on chrome. The name alone still identifies
+        the page; the tagline is landing-page copy. */
+-    .auth-topbar { padding: 12px 16px; flex-wrap: nowrap; gap: 10px; }
++    /* WRAP, not nowrap. Measured at 360px: brand 132.9 + theme toggle 44 +
++       "Back to Home" 173.2 + two 10px gaps + 32px of padding = a 386px floor on
++       a 360px viewport. Every one of the five auth pages scrolled 26px sideways
++       and sliced the end off the Back link - the widest phone-sized defect in
++       the app. `nowrap` was added to stop the bar becoming two rows on a tablet;
++       it is not needed for that, because at tablet widths the content fits on
++       one line anyway and `wrap` only acts when it cannot. */
++    .auth-topbar { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+     .auth-theme { width: 44px; height: 44px; }
+     .auth-brand-sub { display: none; }
+     .auth-back {

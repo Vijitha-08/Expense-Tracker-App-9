@@ -122,4 +122,92 @@ const sendResetCode = async ({ to, name, code, minutes }) => {
     return { delivered: true };
 };
 
-module.exports = { sendResetCode, verifyTransport, mailConfigured: () => CONFIGURED };
+// ------------------------------------------------------------------
+// Contact form notification
+// ------------------------------------------------------------------
+// A different shape of email from the reset code, and the differences are the
+// point:
+//
+//   * it goes TO the site owner, not to the person who filled in the form, so
+//     the address comes from CONTACT_TO (falling back to SMTP_USER - the account
+//     already sending, which is a sane default rather than a silent nowhere).
+//   * replyTo is the sender, so hitting Reply in a mail client answers them
+//     without anybody copying an address out by hand.
+//   * it does NOT throw in production when SMTP is unconfigured. sendResetCode
+//     refuses because the alternative is printing a working credential into a
+//     log. There is no credential here, and the message is already saved in the
+//     database - refusing would turn "we could not email you about it" into "we
+//     could not accept it", which is worse and untrue.
+const contactPlain = ({ name, email, message, id }) =>
+    `New message from the Expense Tracker contact form.
+
+From:    ${name} <${email}>
+Message #${id}
+
+${message}
+
+Reply to this email to answer them directly.`;
+
+// The sender's words go in a <pre> so line breaks survive, and it is the only
+// place in this file that renders text somebody else typed. React escapes for
+// us everywhere in the app EXCEPT here, where the HTML is built by hand - so it
+// is escaped explicitly. Without this, a message containing "<script>" would be
+// live markup in whoever opens the notification.
+const escapeHtml = (s) =>
+    String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+const contactHtml = ({ name, email, message, id }) => `
+<div style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+            max-width:560px;margin:0 auto;padding:8px 4px;color:#0f172a">
+  <p style="font-size:15px;margin:0 0 4px">
+    New message from the <b>Expense Tracker</b> contact form.
+  </p>
+  <p style="font-size:13.5px;color:#5e6e85;margin:0 0 18px">
+    Message #${id} &middot; reply to this email to answer them directly.
+  </p>
+  <table style="font-size:14px;border-collapse:collapse;margin-bottom:16px">
+    <tr><td style="padding:2px 12px 2px 0;color:#5e6e85">Name</td>
+        <td style="padding:2px 0"><b>${escapeHtml(name)}</b></td></tr>
+    <tr><td style="padding:2px 12px 2px 0;color:#5e6e85">Email</td>
+        <td style="padding:2px 0"><a href="mailto:${escapeHtml(email)}"
+            style="color:#4f46e5">${escapeHtml(email)}</a></td></tr>
+  </table>
+  <pre style="margin:0;padding:16px;background:#f6f7fb;border:1px solid #e4e7f2;
+              border-radius:12px;font:inherit;font-size:14.5px;
+              white-space:pre-wrap;word-break:break-word">${escapeHtml(message)}</pre>
+</div>`;
+
+const sendContactMessage = async ({ name, email, message, id }) => {
+    if (!CONFIGURED) {
+        console.log(
+            `\n  [contact form] SMTP not configured - not emailed.` +
+            `\n  #${id} from ${name} <${email}>` +
+            `\n  The message IS saved in contact_messages.` +
+            `\n  Set SMTP_HOST / SMTP_USER / SMTP_PASS in backend/.env to be notified by email.\n`
+        );
+        return { delivered: false };
+    }
+
+    await getTransport().sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: process.env.CONTACT_TO || process.env.SMTP_USER,
+        // Not `from`: some providers refuse to send a message claiming to be
+        // from an address they do not own, which is why the sender goes here.
+        replyTo: `${name} <${email}>`,
+        subject: `Contact form: ${name}`,
+        text: contactPlain({ name, email, message, id }),
+        html: contactHtml({ name, email, message, id }),
+    });
+    return { delivered: true };
+};
+
+module.exports = {
+    sendResetCode,
+    sendContactMessage,
+    verifyTransport,
+    mailConfigured: () => CONFIGURED,
+};

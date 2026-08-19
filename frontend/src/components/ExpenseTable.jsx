@@ -5,9 +5,14 @@ import { money, prettyDate } from "../services/format";
 // `showOwner` turns this into the admin's all-expenses table; without it, it is
 // the owner's own list. One component means the two views cannot drift apart
 // in formatting the way the original duplicated pages did.
+// `format` and `dateFormat` default to the exact/long helpers, so a caller that
+// passes neither renders exactly as before. The user dashboard passes
+// display.amount and display.date, which is what carries the estimate switch and
+// the date-format choice into this table.
 const ExpenseTable = ({
     expenses, onEdit, onDelete, showOwner = false,
     emptyText = "Nothing here yet.",
+    format = money, dateFormat = prettyDate,
 }) => {
     // Inline confirmation instead of window.confirm(): a native dialog blocks
     // the whole page, cannot be styled, and is awkward to drive in tests.
@@ -38,7 +43,7 @@ const ExpenseTable = ({
 
                         return (
                             <tr key={e.id}>
-                                <td className="nowrap">{prettyDate(e.expense_date)}</td>
+                                <td className="nowrap">{dateFormat(e.expense_date)}</td>
 
                                 {showOwner && (
                                     <td>
@@ -63,7 +68,7 @@ const ExpenseTable = ({
 
                                 <td><span className="cat-chip">{e.category}</span></td>
 
-                                <td className="right mono">{money(e.amount)}</td>
+                                <td className="right mono">{format(e.amount)}</td>
 
                                 {hasActions && (
                                     <td className="right">

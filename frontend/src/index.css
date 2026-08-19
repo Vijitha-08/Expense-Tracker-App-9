@@ -8,8 +8,20 @@
   /* ink */
   --ink:        #0f172a;
   --ink-soft:   #334155;
-  --muted:      #64748b;
-  --muted-soft: #94a3b8;
+  /* Was #64748b: 4.76:1 on pure white but 4.49 on --page, 4.19 on --page-alt and
+     4.20 on --accent-wash, so it failed AA everywhere it sits on a tint - table
+     headers, .adm-head p, .dash-sub, .adm-note. Same hue and chroma, lightness
+     dropped in OKLCH until the worst ground clears 4.55. */
+  --muted:      #5e6e85;
+  /* Was #94a3b8 = 2.56:1 on white, 2.26 on --page-alt: a full rank below AA and
+     used for real text (hints, chart axis labels, zero cells, placeholders), not
+     just decoration.
+     WORTH KNOWING: to clear 4.5 on a tinted surface this has to come down to
+     almost exactly --muted, so the fourth ink rank no longer reads lighter than
+     the third. The palette has no readable lighter step on these grounds. The
+     alternative is to stop using rank 4 for text and move those ~16 call sites
+     to --muted, which is a bigger change than one token. */
+  --muted-soft: #606e82;
 
   /* accent */
   --accent:       #4f46e5;
@@ -251,4 +263,20 @@
 
 html {
     scroll-behavior: smooth;
+}
+
+/* Visible to a screen reader, not to the eye. Needed because several forms in
+   this app label their fields with a placeholder only - the contact form had
+   three inputs with no accessible name at all - and a placeholder is not a
+   label: it vanishes the moment you type. `clip-path` plus a 1px box rather
+   than `display: none`, which removes the element from the accessibility tree
+   as well, or a negative text-indent, which some screen readers skip. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

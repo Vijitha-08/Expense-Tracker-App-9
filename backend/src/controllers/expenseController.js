@@ -1,4 +1,5 @@
 const model = require("../models/expenseModel");
+const { toCsv, isoDay } = require("../utils/csv");
 
 // Categories are free text, typed by the user rather than picked from a fixed
 // list. Only length is enforced (the column is VARCHAR(50)); an empty value
@@ -127,7 +128,41 @@ const getSummary = async (req, res) => {
     }
 };
 
+// ---------------------------------------------------------------
+// CSV export of the signed-in user's own expenses.
+//
+// A separate endpoint from the admin one on purpose: /api/admin/expenses/export
+// returns EVERY user's rows and is behind requireRole("admin"), so a user
+// calling it gets a 403. This route sits under the router's own
+// requireRole("user") and passes req.user.id, so it can only ever return the
+// caller's rows - the scoping is not a filter the client asks for.
+//
+// The 500 is the model's own hard cap (Math.min(limit, 500)) rather than a
+// number chosen here, so it is stated in the UI too. Someone with more than 500
+// entries would otherwise get a silently truncated file, which is worse than a
+// visible limit.
+const EXPORT_LIMIT = 500;
+
+const exportMyExpenses = async (req, res) => {
+    try {
+        const expenses = await model.listExpenses({ userId: req.user.id, limit: EXPORT_LIMIT });
+        const header = ["Date", "Title", "Category", "Amount", "Description"];
+        const rows = expenses.map((e) => [
+            isoDay(e.expense_date),
+            e.title, e.category, e.amount, e.description,
+        ]);
+
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", 'attachment; filename="my-expenses.csv"');
+        return res.send(toCsv(header, rows));
+    } catch (err) {
+        console.error("exportMyExpenses failed:", err);
+        return res.status(500).json({ message: "Could not build the export" });
+    }
+};
+
 module.exports = {
     addExpense, getExpenses,
     getExpense, updateExpense, deleteExpense, getSummary,
+    exportMyExpenses,
 };

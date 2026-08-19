@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, NavLink } from "react-router-dom";
 import {
     FiTrendingUp, FiLogOut, FiShield, FiUser, FiSun, FiMoon, FiMenu, FiX,
+    FiGrid, FiSettings,
 } from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
 import { useDisplay } from "../context/useDisplay";
@@ -17,15 +18,37 @@ const ROLE_LOOK = {
 // no reason to collapse as early as a 250px sidebar does.
 const NAV_BREAKPOINT = 720;
 
-// Shared chrome for both dashboards: brand bar, who is signed in, log out, and
-// an optional row of section tabs. The admin passes tabs; the user does not,
-// which is part of why the two pages read as different products.
+// Two pages, listed here rather than hard-coded in the markup so a third one is
+// one line. Both links show at every width: a Settings-only bar would leave
+// somebody on Settings with no way back to the dashboard except the browser's
+// back button, since the brand mark goes to the public home page.
+const NAV = [
+    { to: "/user/dashboard", label: "Dashboard", Icon: FiGrid },
+    { to: "/user/settings",  label: "Settings",  Icon: FiSettings },
+];
+
+// Same two-initial rule as the admin sidebar's `.adm-avatar`. Two, not three:
+// three initials on a 38px pip has to shrink the type to fit, and the pip is
+// there to be recognised at a glance rather than read.
+const initials = (name) =>
+    String(name || "?")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase();
+
+// Shared chrome for the user pages: brand bar, page links, who is signed in,
+// the theme control and log out, plus an optional row of section tabs. The
+// Settings page passes tabs for its own sections; the dashboard does not.
 const DashboardLayout = ({
     title, subtitle, children, actions, tabs, activeTab, onTabChange,
 }) => {
     const { user, logout } = useAuth();
-    // The user side has no Settings page, so this bar is the only place a
-    // theme control can live. Same shared preference as the navbar and the
+    // One-click flip, kept here as well as on Settings > Display: this is the
+    // control you reach for while looking at the page, and Settings is where you
+    // go to pick "System" again. Same shared preference as the navbar and the
     // admin sidebar.
     const { resolvedTheme, toggleTheme } = useDisplay();
     const dark = resolvedTheme === "dark";
@@ -91,7 +114,35 @@ const DashboardLayout = ({
                     id="dash-side-panel"
                 >
                     <div className="dash-user">
+                        <nav className="dash-nav" aria-label="Your pages">
+                            {/* The admin sidebar's group heading, matched here.
+                                Inside the <nav> rather than beside it so the
+                                drawer's own column layout puts it directly over
+                                the links with no extra wrapper; CSS hides it
+                                above 720px, where the bar has no room for a
+                                heading and does not need one. */}
+                            <p className="dash-nav-label">Overview</p>
+                            {NAV.map(({ to, label, Icon }) => (
+                                <NavLink
+                                    key={to}
+                                    to={to}
+                                    className={({ isActive }) =>
+                                        `dash-nav-link${isActive ? " dash-nav-on" : ""}`
+                                    }
+                                    onClick={closeNav}
+                                >
+                                    <Icon aria-hidden="true" />
+                                    {label}
+                                </NavLink>
+                            ))}
+                        </nav>
                         <span className="dash-user-meta">
+                            {/* Drawer-only, by CSS. The desktop bar hides the
+                                name itself at that width for room, so a pip
+                                beside a hidden name would be decoration. */}
+                            <span className="dash-avatar" aria-hidden="true">
+                                {initials(user?.name)}
+                            </span>
                             <strong>{user?.name}</strong>
                             <span className={`role-chip role-${user?.role}`}>
                                 <RoleIcon aria-hidden="true" /> {role.label}

@@ -9,7 +9,8 @@ import CategoryDonut from "../components/CategoryDonut";
 import ExpenseTable from "../components/ExpenseTable";
 import ExpenseDrawer from "../components/ExpenseDrawer";
 import { useAuth } from "../context/useAuth";
-import { money, currentMonthKey, percent, movementWords } from "../services/format";
+import { currentMonthKey, percent, movementWords } from "../services/format";
+import { useDisplay } from "../context/useDisplay";
 import * as svc from "../services/expenseService";
 
 const loadAll = () =>
@@ -69,6 +70,7 @@ const rangeFor = (id) => {
 
 const UserDashboard = () => {
     const { user } = useAuth();
+    const display = useDisplay();
     const [state, setState] = useState({ data: null, error: "", loading: true });
     const alive = useRef(true);
 
@@ -100,7 +102,10 @@ const UserDashboard = () => {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState("All");
-    const [period, setPeriod] = useState("all");
+    // Seeded from Settings > Display > "Default period", the same way every
+    // admin page seeds its own picker. It was hardcoded to "all", which made that
+    // preference a control with nothing behind it on this side.
+    const [period, setPeriod] = useState(display.defaultPeriod);
 
     // Memoised so the `?? []` fallback is a stable reference - without this,
     // every render creates a fresh empty array and the period useMemo below
@@ -167,7 +172,12 @@ const UserDashboard = () => {
     return (
         <DashboardLayout
             title={`Hi ${firstName(user?.name)}`}
-            subtitle="Track what you spend. Every figure here is exact, to the rupee."
+            // "exact, to the rupee" is a promise this page can no longer make
+            // unconditionally: with estimated amounts on, every figure on it is
+            // rounded. The line now says which of the two you are looking at.
+            subtitle={display.estimated
+                ? "Track what you spend. Figures are rounded — switch estimates off in Settings for exact amounts."
+                : "Track what you spend. Every figure here is exact, to the rupee."}
             actions={
                 <button className="btn btn-primary btn-lg" onClick={openNew}>
                     <FiPlus aria-hidden="true" /> New expense
@@ -185,14 +195,14 @@ const UserDashboard = () => {
                     items={[
                         {
                             label: "This month",
-                            value: money(thisMonth?.total || 0),
+                            value: display.amount(thisMonth?.total || 0),
                             sub: trendNote,
                             Icon: FiCalendar,
                             tone: "accent",
                         },
                         {
                             label: "Total spent",
-                            value: money(totals.total_amount),
+                            value: display.amount(totals.total_amount),
                             sub: `${totals.total_count} ${
                                 totals.total_count === 1 ? "entry" : "entries"
                             } all time`,
@@ -200,15 +210,15 @@ const UserDashboard = () => {
                         },
                         {
                             label: "Average entry",
-                            value: money(totals.average_amount),
-                            sub: `Largest ${money(totals.largest_amount)}`,
+                            value: display.amount(totals.average_amount),
+                            sub: `Largest ${display.amount(totals.largest_amount)}`,
                             Icon: FiBarChart2,
                         },
                         {
                             label: "Top category",
                             value: topCategory ? topCategory.category : "—",
                             sub: topCategory
-                                ? `${money(topCategory.total)} · ${percent(
+                                ? `${display.amount(topCategory.total)} · ${percent(
                                       topCategory.total,
                                       totals.total_amount
                                   )}% of your spend`
@@ -221,8 +231,8 @@ const UserDashboard = () => {
             )}
 
             <div className="grid-2">
-                <MonthlyTrend months={months} title="Your spend over time" />
-                <CategoryDonut categories={categories} title="Where your money goes" />
+                <MonthlyTrend months={months} title="Your spend over time" format={display.amount} />
+                <CategoryDonut categories={categories} title="Where your money goes" format={display.amount} />
             </div>
 
             <section className="panel">
@@ -255,7 +265,7 @@ const UserDashboard = () => {
                         </label>
 
                         <span className="period-note" aria-live="polite">
-                            <strong>{activePeriod.label}:</strong> {money(periodTotal)} ·{" "}
+                            <strong>{activePeriod.label}:</strong> {display.amount(periodTotal)} ·{" "}
                             {inPeriod.length} {inPeriod.length === 1 ? "entry" : "entries"}
                         </span>
                     </div>
@@ -268,6 +278,8 @@ const UserDashboard = () => {
                         expenses={visible}
                         onEdit={openEdit}
                         onDelete={handleDelete}
+                        format={display.amount}
+                        dateFormat={display.date}
                         emptyText={
                             expenses.length === 0
                                 ? "No expenses yet. Use New expense to add your first one."

@@ -11,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import UserRegister from "./pages/UserRegister";
 import AdminRegister from "./pages/AdminRegister";
 import UserDashboard from "./pages/UserDashboard";
+import UserSettings from "./pages/UserSettings";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
@@ -22,7 +23,13 @@ import AdminSettings from "./pages/AdminSettings";
 import "./App.css";
 
 // Each admin page is its own route rather than a tab inside one component, so
-// the sidebar can highlight the current section and a link is shareable.
+// the sidebar can highlight the current section and a link is shareable. The
+// user side now has two pages for the same reason, listed the same way.
+const userPages = [
+  { path: "dashboard", Page: UserDashboard },
+  { path: "settings",  Page: UserSettings },
+];
+
 const adminPages = [
   { path: "dashboard", Page: AdminDashboard },
   { path: "users",     Page: AdminUsers },
@@ -52,14 +59,18 @@ function App() {
             <Route path="/register/admin" element={<AdminRegister />} />
 
             {/* role-gated */}
-            <Route
-              path="/user/dashboard"
-              element={
-                <ProtectedRoute allow={["user"]}>
-                  <UserDashboard />
-                </ProtectedRoute>
-              }
-            />
+            {userPages.map(({ path, Page }) => (
+              <Route
+                key={path}
+                path={`/user/${path}`}
+                element={
+                  <ProtectedRoute allow={["user"]}>
+                    <Page />
+                  </ProtectedRoute>
+                }
+              />
+            ))}
+            <Route path="/user" element={<Navigate to="/user/dashboard" replace />} />
 
             {adminPages.map(({ path, Page }) => (
               <Route

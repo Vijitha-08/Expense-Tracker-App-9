@@ -72,6 +72,10 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/expenses", require("./routes/expenseRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
+// The public contact form. Mounted last of the four because it is the only one
+// with no auth middleware anywhere behind it - kept visible here rather than
+// buried, so nobody has to open the route file to learn that.
+app.use("/api/contact", require("./routes/contactRoutes"));
 
 app.use((req, res) => res.status(404).json({ message: `No route for ${req.method} ${req.originalUrl}` }));
 

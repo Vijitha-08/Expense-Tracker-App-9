@@ -1302,7 +1302,10 @@
         grid-template-columns: minmax(0, 1fr);
         gap: 4px;
     }
-    .adm-side-panel .adm-nav-link { padding: 12px; }
+    /* 12px of padding around 13.5px text comes to 41px, which is under the
+       44px floor every other control in this drawer clears. Measured at 41px on
+       all six admin pages with the drawer open. */
+    .adm-side-panel .adm-nav-link { padding: 12px; min-height: 44px; }
 
     /* The row styling now lives in the base rule; the drawer only widens the
        padding to match its own gutters. */
@@ -1372,7 +1375,13 @@
     .adm-tab,
     .adm-select,
     .adm-logout,
-    .adm-drop { min-height: 44px; }
+    .adm-drop,
+    /* The search box (43px) and the settings fields (38px) were missing from
+       this list. The font-size bump above stops iOS zooming when they are
+       focused, but it does not make them big enough to hit - and the search box
+       is the first thing touched on the Users and All expenses pages. */
+    .adm-search input,
+    .adm-fld input { min-height: 44px; }
 
     /* Same 44px floor the nav toggle already gets - 40px is fine under a mouse
        and not under a thumb. Height only: the control is a full-width row now,

@@ -132,7 +132,16 @@ body {
    every route paints its own full-height background over it (`.adm`, `.dash`,
    `.auth` and the landing sections all do), so this is only ever seen in the
    over-scroll gutter. */
-:root[data-theme="dark"] body { background: var(--dk-page); }
+:root[data-theme="dark"] body { background: var(--dk-page); color: var(--dk-ink); }
+
+/* The colour half of that was missing, and it is not cosmetic. `body { color:
+   var(--ink) }` at the top of this file sits OUTSIDE the dark scope - dark
+   remaps its tokens on `.site`, `.auth` and `.dash`, not on the document - so
+   anything that inherits its ink from the body rather than from one of those
+   three roots painted #0f172a on a #0b1020 page: near-black on near-black.
+   Nothing in the app relies on that inheritance today, which is why it was not
+   visible, but the next element added outside those three wrappers would have
+   rendered invisible in dark mode with no clue why. */
 
 .navbar {
     display: flex;
@@ -429,19 +438,13 @@ body {
     resize: none;
 }
 
-.contact-form button {
-    padding: 15px;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 18px;
-    cursor: pointer;
-}
-
-.contact-form button:hover {
-    background: var(--accent);
-}
+/* The `.contact-form button` rule that stood here was dead. Every one of its
+   declarations is overridden by the themed rule further down this file, which
+   sets `--fill`/`--on-fill` instead of hardcoding `var(--accent)` and `white` -
+   and a hardcoded white on a hardcoded accent is exactly the pair that breaks
+   when the palette moves. Its `:hover` was dead twice over: it set the
+   background to the same value as the rest state, so hovering did nothing.
+   Removed rather than left as a decoy for the next person reading this file. */
 
 
 /* ================= FOOTER ================= */
@@ -757,6 +760,43 @@ body {
     cursor: pointer;
 }
 .contact-form button:hover { background: var(--fill-hover); }
+.contact-form button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+}
+.contact-form button svg { width: 17px; height: 17px; }
+/* The form can be submitting now, and a control that looks identical while it
+   is busy invites a second and third press. */
+.contact-form button:disabled { opacity: .6; cursor: progress; }
+.contact-form input:disabled,
+.contact-form textarea:disabled { opacity: .7; }
+
+/* The placeholder was never styled, so it fell back to the browser default -
+   measured at 3.37:1 in light and 3.37:1 in DARK, the only contrast fault in
+   this app that fails in both themes. It is also the only label these three
+   fields had until now, which is why it mattered more here than anywhere else.
+   `opacity: 1` because Firefox applies its own to placeholders. */
+.contact-form input::placeholder,
+.contact-form textarea::placeholder { color: var(--muted); opacity: 1; }
+
+/* Where the server's answer lands. Not colour alone - each carries its own icon
+   from the component, and the wording says what happened.
+
+   Scoped `.contact .contact-note`, not `.contact-note`, and that is not tidiness:
+   `.contact p` above sets `color: var(--muted); margin-bottom: 40px` and the note
+   IS a <p> inside `.contact`. At equal-looking specificity it is (0,1,1) against
+   (0,1,0), so it wins - the first render of this came out muted grey with a 40px
+   gap under it instead of green or red. Caught by screenshot, not by reading:
+   getComputedStyle would have shown the same wrong answer as the page. */
+.contact .contact-note {
+    display: flex; align-items: flex-start; gap: 9px;
+    margin: 0 0 4px; padding: 12px 14px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    font-size: 14.5px; font-weight: 600; text-align: left;
+}
+.contact .contact-note svg { flex: none; width: 17px; height: 17px; margin-top: 1px; }
+.contact .contact-note-ok  { background: var(--ok-wash);  border-color: var(--ok-line);  color: var(--ok); }
+.contact .contact-note-bad { background: var(--bad-wash); border-color: var(--bad-line); color: var(--bad); }
 
 /* ---- footer ---- */
 .footer { background: var(--footer); color: var(--footer-ink); }
