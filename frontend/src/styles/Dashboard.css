@@ -1495,7 +1495,9 @@
     white-space: nowrap;
 }
 /* Due now is amber, not red: a bill coming round is a thing to look at, not a
-   failure. Red is reserved for --bad, which on this page means Remove. */
+   failure. Red is kept for the two things that ARE failures - Remove, and a
+   bill whose due date has already gone past. */
+.dash .rem-overdue   { background: var(--bad-wash);    color: var(--bad);    border-color: var(--bad-line); }
 .dash .rem-due       { background: var(--warn-wash);   color: var(--warn);   border-color: var(--warn-line); }
 .dash .rem-scheduled { background: var(--accent-wash); color: var(--accent); border-color: var(--accent-line); }
 .dash .rem-sent      { background: var(--ok-wash);     color: var(--ok);     border-color: var(--ok-line); }
@@ -1571,3 +1573,112 @@
 @media (max-width: 620px) {
     .dash .rem-edit .form-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ------------------------------------------------------------
+   ROUND 14: typed reminders and upcoming bills
+   ------------------------------------------------------------
+   Again, no literal colours - every value is a token, so dark mode needs no
+   block of its own.
+   ------------------------------------------------------------ */
+
+/* "not paid yet" on a bill's row. Deliberately NOT a `.rem-pill`: the pill in
+   the Status column is the reminder's state, and a second pill on the same row
+   would compete with it. This is a quiet inline note in the muted ink the
+   `.title-cell small` line already uses, weighted just enough to be findable. */
+.dash .rem-tag {
+    font-weight: 700;
+    color: var(--warn);
+}
+
+/* The block that appears when Others is chosen. An inset accent edge and the
+   --field tint mark it as a branch of the form rather than more of the same
+   form, which matters because choosing wrongly here is the one mistake on this
+   page that puts a wrong number in the user's totals.
+   Inset shadow, not border-left: `.dash` is border-box, so a 3px border would
+   eat 3px of the padding and shift every control inside it. */
+.dash .rem-typed {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--field);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+/* `.dash-set-txt` + `.dash-pick` are a two-column row inside `.dash-set-row`,
+   which this is not - so the pair needs its own alignment.
+   `min-width: 0` IS THE LOAD-BEARING LINE. A flex item defaults to
+   `min-width: auto`, which for a <button> is its content's min-content width -
+   so `flex: 1` could grow the two choices but never shrink them. Measured at
+   390px: 201px per button, 402px total, and the whole page scrolled sideways by
+   39px. With min-width: 0 they share whatever room there is, and flex-wrap lets
+   them stack rather than squeeze illegibly on the narrowest screens. */
+.dash .rem-typed .dash-pick {
+    align-self: stretch;
+    flex-wrap: wrap;
+}
+.dash .rem-typed .dash-pick button {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* The consequence note. Amber when a bill is selected, because "this is NOT
+   added to your expenses" is the sentence that stops somebody double-counting a
+   payment, and the default muted note is too quiet to carry it. */
+.dash .rem-note-bill {
+    background: var(--warn-wash);
+    border: 1px solid var(--warn-line);
+    border-radius: var(--r-sm);
+    padding: 10px 12px;
+    color: var(--warn);
+}
+.dash .rem-note-bill svg { color: var(--warn); }
+
+/* A disabled field still has to be readable - it is explaining why it is off via
+   its title attribute, and greyed-to-invisible would hide the label too. */
+.dash .rem-typed input:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 620px) {
+    /* Same reasoning as the `.dash-set-form .form-row` rule further up: two
+       columns of 150px cannot hold "Date paid" and a date picker on a phone. */
+    .dash .rem-typed .form-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------------
+   ROUND 15: marking an occurrence paid
+   ------------------------------------------------------------ */
+
+/* Green, because this is the one status on the page that means "nothing to do".
+   --ok is the token the alerts already use for success, so a Paid pill and a
+   success banner agree with each other. */
+.dash .rem-paid { background: var(--ok-wash); color: var(--ok); border-color: var(--ok-line); }
+
+/* A settled row is dimmed exactly like a switched-off one - same rule, same
+   value - because they mean the same thing to the reader: still here, not
+   asking for anything. The Undo button stays at full strength for the same
+   reason the switch does on a disabled row: it is the control you came for. */
+.dash .rem-row-paid > td { opacity: .72; }
+.dash .rem-row-paid .btn { opacity: 1; }
+
+/* The "Paid" action. `.btn-ok` did not exist - the file had primary, ghost and
+   danger - and none of those is right: primary is reserved for the form's own
+   submit, ghost reads as secondary, and danger is red for a thing that is good
+   news. Built from the same tokens as `.btn-danger` directly above, so the two
+   are the same shape in opposite colours. */
+.dash .btn-ok {
+    background: var(--ok-wash);
+    border: 1px solid var(--ok-line);
+    color: var(--ok);
+}
+.dash .btn-ok:hover:not(:disabled) { border-color: var(--ok); }
+.dash .btn-ok:disabled { opacity: .6; cursor: not-allowed; }
+
+/* The Upcoming / Paid / All chips. `.filter-row` and `.chip` already exist and
+   are used on the admin expense table; this only adds the spacing above them,
+   because there they sit inside `.table-controls` and here they sit directly
+   under a `.panel-head`. */
+.dash .rem-views { margin: 0 0 14px; }

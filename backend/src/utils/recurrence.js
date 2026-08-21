@@ -29,7 +29,17 @@ const DAY_MS = 86400000;
 // not a month count and is handled by its own branch, which needs no clamping.
 const MONTHS_PER = { monthly: 1, quarterly: 3, yearly: 12 };
 
-const FREQUENCIES = ["weekly", "monthly", "quarterly", "yearly"];
+// "once" is a real frequency here rather than a null: a bill that happens once
+// still needs a due date, a reminder and a status, and every code path that
+// takes a frequency would otherwise need a null check. It is listed FIRST
+// because it is only offered alongside a typed due date, and reading the list
+// top-down then goes "just this once, then every week, every month...".
+const FREQUENCIES = ["once", "weekly", "monthly", "quarterly", "yearly"];
+
+// The frequencies that can be projected from a past expense. "once" cannot -
+// there is nothing to project - so it is only valid with an explicit due date,
+// and the controller enforces that.
+const RECURRING = ["weekly", "monthly", "quarterly", "yearly"];
 
 // The three lead times the page offers - "1 day before", "3 days before",
 // "1 week before". Kept here rather than in the controller so the CHECK
@@ -127,18 +137,69 @@ const addMonths = (anchor, months) => {
 // blocks future dates with max={today()}, but the server's parseBody does not,
 // so a PUT to /api/expenses can still set one - and skipping past it would hide
 // the very date the user chose.
-const nextOccurrence = (anchorValue, frequency, fromValue) => {
+//
+// `inclusive` FLIPS THAT WHOLE RULE, and it is the difference between the two
+// kinds of anchor this app now has:
+//
+//   * an EXPENSE date (inclusive: false, the default) is money already spent, so
+//     the occurrence on it is done and the next one is a period later.
+//   * a STATED due date (inclusive: true) is a bill the user typed in and has
+//     NOT paid. Its own date is the answer, and "due today" is exactly what
+//     should be shown on the day. Rolling it forward a month would hide the
+//     date they just chose.
+// `after` SKIPS OCCURRENCES ALREADY SETTLED, and it has to be the occurrence's
+// own date rather than the date somebody paid. Paying early is the case that
+// makes this necessary: a monthly bill due the 23rd, paid on the 21st, must
+// advance to the 23rd of NEXT month. Comparing against the payment date (21st)
+// would leave this month's 23rd still showing as due in two days, when it has
+// just been paid. So markPaid records which occurrence it settled, and that
+// date is what is passed here.
+const nextOccurrence = (anchorValue, frequency, fromValue, { inclusive = false, after = null } = {}) => {
     const anchor = toUtcDay(anchorValue);
     if (!anchor) return null;
     const from = toUtcDay(fromValue) || todayUtc();
-    if (anchor > from) return anchor;
+    const settled = toUtcDay(after);
+
+    // The first candidate is the plain answer; `advance` below then steps past
+    // anything already settled.
+    const advance = (date) => {
+        if (!date || !settled || date > settled) return date;
+        // At most a handful of steps in practice - `settled` is an occurrence of
+        // this same series, so it is one period behind at worst. Bounded anyway,
+        // because an unbounded while loop over user data is how a request hangs.
+        let out = date;
+        for (let i = 0; i < 600 && out && out <= settled; i += 1) {
+            out = frequency === "weekly"
+                ? new Date(out.getTime() + 7 * DAY_MS)
+                : addMonths(out, MONTHS_PER[frequency] || 1);
+        }
+        return out;
+    };
+
+    if (anchor > from) return advance(anchor);
+    // A stated due date that has arrived, or passed and does not recur, IS the
+    // answer. Recurring stated dates fall through and roll forward below.
+    if (inclusive && anchor.getTime() === from.getTime()) return advance(anchor);
+
+    // "Just once" never projects. A one-off in the past stays in the past - it
+    // is overdue, and statusFor() says so rather than quietly inventing a next
+    // occurrence for a bill that only ever happens once. `advance` is not
+    // applied: a settled one-off is finished, and describe() answers "paid"
+    // rather than inventing a date it will never come round on again.
+    if (frequency === "once") return anchor;
 
     if (frequency === "weekly") {
         // Exact: a week is always 7 days, so there is nothing to clamp. The
         // floor of 1 is the "after the anchor" rule - without it an anchor dated
-        // today would come back as today.
-        const weeks = Math.max(1, Math.ceil((from - anchor) / (7 * DAY_MS)));
-        return new Date(anchor.getTime() + weeks * 7 * DAY_MS);
+        // today would come back as today. An inclusive anchor floors at 0
+        // instead, so a stated due date can be today.
+        const floor = inclusive ? 0 : 1;
+        const weeks = Math.max(floor, Math.ceil((from - anchor) / (7 * DAY_MS)));
+        // advance() here too, not just on the monthly path below. Leaving it off
+        // meant a paid weekly occurrence came back unchanged - the row still read
+        // "due today" after being marked paid. Every return from this function
+        // has to go through advance() or the skip silently does nothing.
+        return advance(new Date(anchor.getTime() + weeks * 7 * DAY_MS));
     }
 
     const step = MONTHS_PER[frequency];
@@ -151,18 +212,20 @@ const nextOccurrence = (anchorValue, frequency, fromValue) => {
     // the occurrence before it is also on or after `from`. Each runs once or
     // twice at most.
     //
-    // Both bounds floor at ONE period, never zero - the "after the anchor" rule
-    // above. Period zero is the anchor itself, which is the expense already
-    // recorded.
+    // Both bounds floor at ONE period for an expense anchor, never zero - the
+    // "after the anchor" rule above, where period zero is the expense already
+    // recorded. An inclusive (stated) anchor floors at ZERO, because period zero
+    // is the due date the user typed and it has not been paid.
+    const floor = inclusive ? 0 : 1;
     const monthsApart =
         (from.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
         (from.getUTCMonth() - anchor.getUTCMonth());
-    let periods = Math.max(1, Math.floor(monthsApart / step));
+    let periods = Math.max(floor, Math.floor(monthsApart / step));
 
     while (addMonths(anchor, periods * step) < from) periods += 1;
-    while (periods > 1 && addMonths(anchor, (periods - 1) * step) >= from) periods -= 1;
+    while (periods > floor && addMonths(anchor, (periods - 1) * step) >= from) periods -= 1;
 
-    return addMonths(anchor, periods * step);
+    return advance(addMonths(anchor, periods * step));
 };
 
 // The reminder lands `leadDays` before the occurrence. Plain day subtraction,
@@ -183,12 +246,22 @@ const reminderDate = (occurrence, leadDays) =>
 //               yet (delivery is in-app for now, by decision), but the column
 //               exists and is compared here so adding the email job later does
 //               not mean coming back and rewriting this.
+//   overdue   - a "just once" bill whose due date has gone past. Only reachable
+//               for frequency 'once': everything that recurs is projected
+//               forward, so its due date is never behind today. Checked before
+//               `sent`, because a bill that was emailed about and then went
+//               unpaid is still unpaid, and "Reminded" would read as settled.
 //   due       - the remind-on date has arrived and the expense has not come
 //               round yet: today is inside the reminder window.
 //   scheduled - remind-on is still ahead.
-const statusFor = ({ enabled, remindOn, lastSentAt, today }) => {
+const statusFor = ({ enabled, remindOn, dueOn, lastSentAt, paid, today }) => {
     if (!enabled) return "off";
+    // Paid outranks overdue: a one-off settled after its due date is finished,
+    // not late, and telling somebody a bill they have paid is overdue is worse
+    // than saying nothing.
+    if (paid) return "paid";
     const day = today || todayUtc();
+    if (dueOn && dueOn < day) return "overdue";
     if (!remindOn) return "scheduled";
     const sent = toUtcDay(lastSentAt);
     if (sent && sent >= remindOn) return "sent";
@@ -202,21 +275,78 @@ const statusFor = ({ enabled, remindOn, lastSentAt, today }) => {
 // implementation of these rules. The frontend formats what it is given and does
 // no date arithmetic of its own - which is also why a projection can never
 // disagree with the status shown beside it.
+//
+// FOUR DATES CAN BE IN PLAY AND ONLY TWO ARE SHOWN. In precedence order:
+//
+//   row.due_on       a due date the user TYPED. Wins outright, and counts on the
+//                    day itself, because they have not paid it.
+//   row.expense_date the date on the expense this reminder hangs off. Projected
+//                    forward, and the occurrence on it is treated as done.
+//   row.remind_on    a reminder date the user TYPED. Wins over lead_days.
+//   row.lead_days    1, 3 or 7. Used only when remind_on is null.
+//
+// `dueSource` goes back to the page so it can label a stated date differently
+// from a projected one - "due 26 Aug" is a fact, "expected 26 Aug" is a guess
+// drawn from history, and showing them identically would be dishonest.
 const describe = (row, now = new Date()) => {
     const today = todayUtc(now);
-    const dueOn = nextOccurrence(row.expense_date, row.frequency, today);
-    const remindOn = reminderDate(dueOn, row.lead_days);
+
+    // A stated due date is inclusive; an expense anchor is not. See
+    // nextOccurrence for why that distinction is the whole ballgame.
+    const stated = Boolean(row.due_on);
+    const anchor = stated ? row.due_on : row.expense_date;
+
+    // `paid_for` is the occurrence a payment settled - not the date it was paid.
+    // See the comment on nextOccurrence's `after` option for why the difference
+    // matters when somebody pays early.
+    const paidFor = toUtcDay(row.paid_for);
+    const paidOn = toUtcDay(row.paid_on);
+
+    // A ONE-OFF THAT HAS BEEN PAID IS FINISHED, and it stops moving. Its due
+    // date stays on the occurrence that was settled, as a record of what
+    // happened, rather than being projected to a date it will never come round
+    // on again. Handled before the projection because there is nothing to
+    // project.
+    if (row.frequency === "once" && paidFor) {
+        return {
+            dueOn: isoUtc(paidFor),
+            remindOn: isoUtc(reminderDate(paidFor, row.lead_days)),
+            dueSource: stated ? "stated" : "projected",
+            paidOn: isoUtc(paidOn),
+            daysUntilDue: Math.round((paidFor - today) / DAY_MS),
+            daysUntilRemind: null,
+            status: statusFor({ enabled: row.enabled, paid: true, today }),
+        };
+    }
+
+    const dueOn = nextOccurrence(anchor, row.frequency, today, {
+        inclusive: stated,
+        after: paidFor,
+    });
+
+    // An explicit remind_on is used as typed. It is deliberately NOT clamped to
+    // be before dueOn: a reminder set after the due date is odd but it is what
+    // the user asked for, and silently moving somebody's date is worse than
+    // showing it as they set it.
+    const remindOn = row.remind_on ? toUtcDay(row.remind_on) : reminderDate(dueOn, row.lead_days);
 
     return {
         dueOn: isoUtc(dueOn),
         remindOn: isoUtc(remindOn),
-        // Whole days, and never negative: dueOn is >= today by construction and
-        // remindOn is at most `lead_days` behind it.
+        dueSource: stated ? "stated" : "projected",
+        // Sent for display only - "last paid 21 Aug" under a recurring row. It
+        // deliberately does NOT make the status "paid": a recurring reminder
+        // whose occurrence has been settled has already moved on to the next
+        // one, and that next one is genuinely scheduled rather than paid.
+        paidOn: isoUtc(paidOn),
+        // Whole days. Negative only for an overdue one-off, where the count is
+        // the point - "3 days late" is the useful reading.
         daysUntilDue: dueOn ? Math.round((dueOn - today) / DAY_MS) : null,
         daysUntilRemind: remindOn ? Math.round((remindOn - today) / DAY_MS) : null,
         status: statusFor({
             enabled: row.enabled,
             remindOn,
+            dueOn,
             lastSentAt: row.last_sent_at,
             today,
         }),
@@ -227,6 +357,7 @@ module.exports = {
     DAY_MS,
     FREQUENCIES,
     LEAD_DAYS,
+    RECURRING,
     addMonths,
     describe,
     isoUtc,

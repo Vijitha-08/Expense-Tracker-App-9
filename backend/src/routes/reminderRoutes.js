@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
     listReminders, saveReminder, updateReminder, deleteReminder,
+    markPaid, unmarkPaid,
 } = require("../controllers/reminderController");
 const auth = require("../middlewares/authMiddleware");
 const { requireRole } = require("../middlewares/roleMiddleware");
@@ -21,6 +22,12 @@ router.get("/", listReminders);
 // in the model - so saving the same expense twice edits rather than duplicates.
 router.post("/", saveReminder);
 router.put("/:id", updateReminder);
+// A sub-resource rather than a field on PUT /:id, because marking paid is not a
+// settings change: it CREATES an expense. Keeping it on its own verb means the
+// edit form can never fire it by accident, and the 409 for a double-pay has
+// somewhere unambiguous to live.
+router.post("/:id/paid", markPaid);
+router.delete("/:id/paid", unmarkPaid);
 router.delete("/:id", deleteReminder);
 
 module.exports = router;
