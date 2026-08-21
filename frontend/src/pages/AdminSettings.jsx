@@ -12,15 +12,31 @@ import * as profile from "../services/profileService";
 
 // Four sections: My account, Display, Administrators, Data.
 //
-// SCOPE NOTE, so nobody is surprised: My account, Add administrator and Export
-// all talk to the API. The Display switches are stored in this browser
-// (localStorage) rather than the database - they are cosmetic, and adding a
-// settings table for four toggles would mean a migration and a read on every
-// page load for no real gain. Delete and Reset are NOT built: they need
-// destructive endpoints and confirmation flows, and deleting a user deletes
-// every expense they recorded, so that is a decision to take deliberately
-// rather than ship quietly.
+// SCOPE NOTE, so nobody is surprised: every section on this page talks to the
+// API. My account, Add administrator and Export always did.
+//
+// The two that changed:
+//
+//   * Display was localStorage-only, on the reasoning that four cosmetic
+//     toggles did not justify a table. It now ALSO persists to the account via
+//     GET/PUT /api/users/preferences, because signing in on a second machine
+//     gave a different Settings page. localStorage is still the first read, so
+//     the theme paints before any request finishes - see DisplayContext.jsx.
+//
+//   * Reset all expenses and Delete a user account are built. They were held
+//     back for wanting "destructive endpoints and confirmation flows", and both
+//     now have them: the acting admin's own password is re-checked server-side,
+//     a distinct phrase has to be typed, the last administrator can never be
+//     removed, and an admin cannot delete their own account from here. Reset
+//     clears expenses only - no login, name, role or preference is touched.
 const SAMPLE = 11054890;
+
+// Typed confirmation phrases for the Danger zone. Deliberately different from
+// each other, and different again from the two on the user Settings page, so
+// muscle memory from one destructive action cannot carry somebody through a
+// bigger one.
+const RESET_PHRASE = "DELETE ALL EXPENSES";
+const DELETE_USER_PHRASE = "DELETE THIS ACCOUNT";
 
 // "System" first, because it is the default and the one that needs no decision.
 const THEMES = [
@@ -46,12 +62,58 @@ const AdminSettings = () => {
     const [newAdmin, setNewAdmin] = useState({ name: "", email: "", password: "" });
     const [addingAdmin, setAddingAdmin] = useState(false);
     const [admins, setAdmins] = useState([]);
+    // The full list as well as the admin-only slice. The Danger zone's account
+    // picker needs everybody, and loading it from the same response the page
+    // already makes avoids a second request for data that is right there.
+    const [people, setPeople] = useState([]);
+
+    // One piece of state for the whole Danger zone: the acting admin's password,
+    // which action is armed (null = neither), the chosen account, and the typed
+    // confirmation. Together because they are only meaningful together, so
+    // resetting is one assignment.
+    const [danger, setDanger] = useState({ password: "", mode: null, typed: "", targetId: "" });
+    const dangerPhrase = danger.mode === "reset" ? RESET_PHRASE : DELETE_USER_PHRASE;
 
     useEffect(() => {
         admin.getPeople()
-            .then(({ people }) => setAdmins(people.filter((p) => p.role === "admin")))
-            .catch(() => setAdmins([]));
+            .then(({ people: all }) => {
+                setPeople(all);
+                setAdmins(all.filter((p) => p.role === "admin"));
+            })
+            .catch(() => { setPeople([]); setAdmins([]); });
     }, []);
+
+    // Re-reads the people list after a destructive action so the picker and the
+    // admin list on this page cannot keep offering an account that is gone.
+    const reloadPeople = () =>
+        admin.getPeople()
+            .then(({ people: all }) => {
+                setPeople(all);
+                setAdmins(all.filter((p) => p.role === "admin"));
+            })
+            .catch(() => {});
+
+    const runDanger = async (e) => {
+        e.preventDefault();
+        if (!danger.mode || !danger.password || danger.typed !== dangerPhrase) return;
+        if (danger.mode === "user" && !danger.targetId) return;
+        setBusy(true);
+        setError("");
+        try {
+            const res = danger.mode === "reset"
+                ? await admin.resetAllExpenses(danger.password)
+                : await admin.deleteUserAccount(danger.targetId, danger.password);
+            setDanger({ password: "", mode: null, typed: "", targetId: "" });
+            await reloadPeople();
+            flash(res.message);
+        } catch (err) {
+            // Left armed on failure - a wrong password should not make somebody
+            // re-pick the account and retype the phrase.
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
 
     const flash = (message) => {
         setNotice(message);
@@ -395,31 +457,109 @@ const AdminSettings = () => {
                     <div className="adm-panel adm-danger">
                         <div className="adm-panel-head"><h3>Danger zone</h3></div>
                         <p className="adm-fld-hint" style={{ marginTop: 0, marginBottom: 8 }}>
-                            Not built yet, and deliberately so. Deleting a user also deletes every
-                            expense they recorded, and there is no undo — that needs a confirmation
-                            flow and a decision from whoever owns the data, not a button added
-                            quietly.
+                            These affect other people's data and cannot be undone. Both ask for your
+                            own password and then for the exact words shown. The password matters:
+                            your sign-in token travels with every request, so it only proves a
+                            session was opened — a password proves it is you doing this now.
                         </p>
-                        <div className="adm-set-row">
-                            <span className="adm-set-txt">
-                                <b>Reset all expenses</b>
-                                <small>
-                                    Available today from the terminal: <code>npm run db:reset</code>
-                                </small>
-                            </span>
-                            <button type="button" className="adm-btn adm-btn-danger" disabled>
-                                Not available
-                            </button>
-                        </div>
-                        <div className="adm-set-row">
-                            <span className="adm-set-txt">
-                                <b>Delete a user account</b>
-                                <small>Removes the person and all their expenses.</small>
-                            </span>
-                            <button type="button" className="adm-btn adm-btn-danger" disabled>
-                                Not available
-                            </button>
-                        </div>
+
+                        <form onSubmit={runDanger}>
+                            {/* `.adm-fld` is a WRAPPER with a nested <label>, which is how
+                                every other field on this page is built. Putting the class
+                                on the label itself silently loses the uppercase field-label
+                                styling, because the rule is `.adm-fld label`. */}
+                            <div className="adm-fld">
+                                <label htmlFor="adm-danger-pw">Your password</label>
+                                <input id="adm-danger-pw" type="password" autoComplete="current-password"
+                                       value={danger.password}
+                                       onChange={(e) => setDanger({ ...danger, password: e.target.value })} />
+                            </div>
+
+                            <div className="adm-set-row">
+                                <span className="adm-set-txt">
+                                    <b>Reset all expenses</b>
+                                    <small>
+                                        Deletes every expense from every account. Logins, names and
+                                        roles all survive — only spending records go.
+                                    </small>
+                                </span>
+                                <button type="button" className="adm-btn adm-btn-danger" disabled={busy}
+                                        onClick={() => setDanger({ ...danger, mode: "reset", typed: "", targetId: "" })}>
+                                    Reset expenses
+                                </button>
+                            </div>
+
+                            <div className="adm-set-row">
+                                <span className="adm-set-txt">
+                                    <b>Delete a user account</b>
+                                    <small>Removes the person and all their expenses.</small>
+                                </span>
+                                <button type="button" className="adm-btn adm-btn-danger" disabled={busy}
+                                        onClick={() => setDanger({ ...danger, mode: "user", typed: "", targetId: "" })}>
+                                    Delete an account
+                                </button>
+                            </div>
+
+                            {danger.mode === "user" && (
+                                <div className="adm-fld">
+                                    <label htmlFor="adm-danger-who">Which account</label>
+                                    {/* Built from the people list this page already loads, so an id
+                                        cannot be mistyped. Your own account is filtered out - the
+                                        server refuses it too, but offering it would be a trap.
+
+                                        Wrapped in `.adm-select` because `.adm-fld` styles `input`
+                                        only; without it the dropdown renders as an unstyled native
+                                        control next to fields that are not. */}
+                                    <label className="adm-select">
+                                    <select id="adm-danger-who" value={danger.targetId}
+                                            onChange={(e) => setDanger({ ...danger, targetId: e.target.value })}>
+                                        <option value="">Choose a person…</option>
+                                        {people.filter((p) => p.id !== user?.id).map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name} · {p.email}{p.role === "admin" ? " · Administrator" : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    </label>
+                                </div>
+                            )}
+
+                            {danger.mode && (
+                                <>
+                                    <p className="adm-note">
+                                        <FiAlertCircle aria-hidden="true" />
+                                        {danger.mode === "reset"
+                                            ? "This deletes every expense in the organisation, for every account. It cannot be undone."
+                                            : "This deletes the chosen account and every expense on it. It cannot be undone."}
+                                    </p>
+                                    <div className="adm-fld">
+                                        <label htmlFor="adm-danger-phrase">
+                                            Type {danger.mode === "reset" ? RESET_PHRASE : DELETE_USER_PHRASE} to confirm
+                                        </label>
+                                        <input id="adm-danger-phrase" autoComplete="off"
+                                               value={danger.typed}
+                                               onChange={(e) => setDanger({ ...danger, typed: e.target.value })} />
+                                    </div>
+                                    <div className="adm-actions">
+                                        <button type="button" className="adm-btn"
+                                                onClick={() => setDanger({ password: "", mode: null, typed: "", targetId: "" })}>
+                                            Cancel
+                                        </button>
+                                        {/* Password filled, phrase exact, and for a user delete a
+                                            person chosen. The server re-checks all of it; this only
+                                            stops an accidental click. */}
+                                        <button type="submit" className="adm-btn adm-btn-danger"
+                                                disabled={busy || !danger.password
+                                                    || danger.typed !== dangerPhrase
+                                                    || (danger.mode === "user" && !danger.targetId)}>
+                                            {busy ? "Working..." : danger.mode === "reset"
+                                                ? "Yes, delete every expense"
+                                                : "Yes, delete this account"}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </form>
                     </div>
                 </div>
             )}

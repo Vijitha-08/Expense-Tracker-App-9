@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     FiUser, FiSliders, FiDatabase, FiDownload,
     FiAlertCircle, FiCheckCircle, FiInfo,
@@ -50,9 +51,16 @@ const TABS = [
     { id: "data",    label: "My data",    Icon: FiDatabase },
 ];
 
+// Typed confirmation phrases. Deliberately different from each other, so muscle
+// memory from clearing expenses cannot carry somebody through deleting the whole
+// account, and deliberately not the word "DELETE" for both.
+const CLEAR_PHRASE = "CLEAR MY EXPENSES";
+const DELETE_PHRASE = "DELETE MY ACCOUNT";
+
 const UserSettings = () => {
-    const { user, refresh } = useAuth();
+    const { user, refresh, logout } = useAuth();
     const display = useDisplay();
+    const navigate = useNavigate();
 
     const [tab, setTab] = useState("account");
     // Seeded from the signed-in user once. Re-syncing it in an effect would fight
@@ -98,6 +106,37 @@ const UserSettings = () => {
             await profile.changePassword(pw);
             setPw({ currentPassword: "", newPassword: "", confirm: "" });
             flash("Your password was changed");
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    // One piece of state for the whole danger zone: the password, which of the
+    // two actions is armed (null = neither), and what has been typed into the
+    // confirmation box. Kept together because they are only ever meaningful
+    // together, and resetting it is then one assignment.
+    const [danger, setDanger] = useState({ password: "", mode: null, typed: "" });
+    const phrase = danger.mode === "clear" ? CLEAR_PHRASE : DELETE_PHRASE;
+
+    const runDanger = async (e) => {
+        e.preventDefault();
+        if (!danger.mode || danger.typed !== phrase || !danger.password) return;
+        setBusy(true);
+        setError("");
+        try {
+            if (danger.mode === "clear") {
+                const res = await profile.clearMyExpenses(danger.password);
+                setDanger({ password: "", mode: null, typed: "" });
+                flash(res.message);
+            } else {
+                await profile.deleteMyAccount(danger.password);
+                // The account is gone, so every subsequent request would 401.
+                // Log out locally and leave rather than sit on a dead session.
+                logout();
+                navigate("/login?deleted=1", { replace: true });
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -323,32 +362,81 @@ const UserSettings = () => {
                     <div className="panel dash-danger">
                         <div className="panel-head"><h3>Danger zone</h3></div>
                         <p className="dash-hint" style={{ marginTop: 0 }}>
-                            Not built yet, and deliberately so. Deleting your account also deletes
-                            every expense you have recorded, and there is no undo — that needs a
-                            confirmation flow and a decision from whoever owns the data, not a button
-                            added quietly.
+                            Both of these are permanent and there is no undo, so both ask for your
+                            password and then for the exact words below. The password is the point:
+                            your sign-in token travels with every request, so it proves a session was
+                            opened at some point — only a password proves it is you at the keyboard
+                            now.
                         </p>
-                        <div className="dash-set-row">
-                            <span className="dash-set-txt">
-                                <b>Delete my account</b>
-                                <small>Would remove your login and all of your expenses.</small>
-                            </span>
-                            <button type="button" className="btn btn-danger" disabled>
-                                Not available
-                            </button>
-                        </div>
-                        <div className="dash-set-row">
-                            <span className="dash-set-txt">
-                                <b>Clear all my expenses</b>
-                                <small>
-                                    Delete them one at a time from your dashboard for now — each row
-                                    has its own Delete.
-                                </small>
-                            </span>
-                            <button type="button" className="btn btn-danger" disabled>
-                                Not available
-                            </button>
-                        </div>
+
+                        <form className="dash-set-form" onSubmit={runDanger}>
+                            <label htmlFor="us-danger-pw">
+                                Your password
+                                <input id="us-danger-pw" type="password" autoComplete="current-password"
+                                       value={danger.password}
+                                       onChange={(e) => setDanger({ ...danger, password: e.target.value })} />
+                            </label>
+
+                            <div className="dash-set-row">
+                                <span className="dash-set-txt">
+                                    <b>Clear all my expenses</b>
+                                    <small>
+                                        Deletes every expense on your account and keeps the account
+                                        itself. Type <code>{CLEAR_PHRASE}</code> to confirm.
+                                    </small>
+                                </span>
+                                <button type="button" className="btn btn-danger" disabled={busy}
+                                        onClick={() => setDanger({ ...danger, mode: "clear", typed: "" })}>
+                                    Clear expenses
+                                </button>
+                            </div>
+
+                            <div className="dash-set-row">
+                                <span className="dash-set-txt">
+                                    <b>Delete my account</b>
+                                    <small>
+                                        Removes your login and every expense with it. Type{" "}
+                                        <code>{DELETE_PHRASE}</code> to confirm.
+                                    </small>
+                                </span>
+                                <button type="button" className="btn btn-danger" disabled={busy}
+                                        onClick={() => setDanger({ ...danger, mode: "delete", typed: "" })}>
+                                    Delete account
+                                </button>
+                            </div>
+
+                            {danger.mode && (
+                                <>
+                                    <p className="dash-note">
+                                        <FiAlertCircle aria-hidden="true" />
+                                        {danger.mode === "clear"
+                                            ? "This deletes every expense you have recorded. Your account stays."
+                                            : "This deletes your account and every expense on it. It cannot be undone."}
+                                    </p>
+                                    <label htmlFor="us-danger-phrase">
+                                        Type {danger.mode === "clear" ? CLEAR_PHRASE : DELETE_PHRASE} to confirm
+                                        <input id="us-danger-phrase" autoComplete="off"
+                                               value={danger.typed}
+                                               onChange={(e) => setDanger({ ...danger, typed: e.target.value })} />
+                                    </label>
+                                    <div className="form-actions">
+                                        <button type="button" className="btn btn-ghost"
+                                                onClick={() => setDanger({ password: "", mode: null, typed: "" })}>
+                                            Cancel
+                                        </button>
+                                        {/* Enabled only when the password is filled AND the phrase
+                                            matches exactly. The server checks the password again;
+                                            this is just so the button cannot be hit by accident. */}
+                                        <button type="submit" className="btn btn-danger"
+                                                disabled={busy || !danger.password || danger.typed !== phrase}>
+                                            {busy ? "Working..." : danger.mode === "clear"
+                                                ? "Yes, delete my expenses"
+                                                : "Yes, delete my account"}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </form>
                     </div>
                 </div>
             )}

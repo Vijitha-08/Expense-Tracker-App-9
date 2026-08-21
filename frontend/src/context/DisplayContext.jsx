@@ -1,16 +1,31 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { DisplayContext } from "./displayContextValue";
 import { money, moneyApprox } from "../services/format";
+import { readStored, TOKEN_KEY } from "../services/api";
+import { getPreferences, savePreferences } from "../services/profileService";
 
 // Display preferences for the admin panel: whether amounts are shown estimated
 // (~₹1.11 Cr) or exact (₹1,10,54,890), how dates are written, and which period
 // pages open on.
 //
-// Deliberately client-side only. There is no settings table in the database and
-// adding one for four cosmetic switches would mean a migration, an endpoint and
-// a read on every page load. localStorage keeps the choice per browser, which
-// is what a display preference actually is. If these ever need to follow the
-// account across machines, that is the point to move them server-side.
+// WAS client-side only, and the note here said: "If these ever need to follow
+// the account across machines, that is the point to move them server-side."
+// That point arrived - signing in on a second machine gave a different Settings
+// page, which reads as a bug even though nothing was broken.
+//
+// localStorage is still the FIRST read, and that is the important part. The
+// theme has to be on screen before any request finishes or every navigation
+// flashes the wrong one, so local wins the race and the server reconciles a
+// moment later. See the two effects in the provider:
+//
+//   hydrate      once per mount, only when signed in. If the account has saved
+//                preferences they replace the local copy; if it never has
+//                (server returns null) the local copy is kept and becomes the
+//                account's first saved set on the next change.
+//   write-through on every change, to localStorage synchronously and to the
+//                server in the background. A failed PUT is logged, never shown:
+//                the switch has already moved and re-rendering an error over a
+//                cosmetic preference would be worse than the drift.
 const KEY = "expense-tracker-display";
 
 const DEFAULTS = {
@@ -83,6 +98,39 @@ export const DisplayProvider = ({ children }) => {
         document.documentElement.dataset.theme = theme;
     }, [theme]);
 
+    // Holds the JSON the server is known to have. It starts null, is set by the
+    // hydrate effect, and is compared before every PUT - without it, hydrating
+    // would immediately push the values just received straight back, once per
+    // page load, forever.
+    const synced = useRef(null);
+    const hydrated = useRef(false);
+
+    // Hydrate once per mount. Guarded on a stored token because DisplayProvider
+    // wraps the public pages too, and an unauthenticated GET would 401 on every
+    // visit to the landing page.
+    //
+    // setPrefs happens inside the promise callback, not in the effect body -
+    // this repo enables `react-hooks/set-state-in-effect`, which correctly
+    // rejects the second. Same shape UserDashboard uses for its own load.
+    useEffect(() => {
+        if (!readStored(TOKEN_KEY)) { hydrated.current = true; return; }
+        let alive = true;
+        getPreferences()
+            .then((remote) => {
+                if (!alive) return;
+                // null = this account has never saved. Keep the local choice
+                // rather than stamping server defaults over a preference the
+                // person has already expressed in this browser.
+                if (remote) {
+                    synced.current = JSON.stringify(remote);
+                    setPrefs((p) => ({ ...p, ...remote }));
+                }
+            })
+            .catch(() => { /* offline or 401 - local copy is still correct */ })
+            .finally(() => { if (alive) hydrated.current = true; });
+        return () => { alive = false; };
+    }, []);
+
     useEffect(() => {
         try {
             localStorage.setItem(KEY, JSON.stringify(prefs));
@@ -90,6 +138,27 @@ export const DisplayProvider = ({ children }) => {
             // A browser with storage blocked still works, it just forgets the
             // choice on reload. Not worth failing the whole app over.
         }
+
+        // Write-through to the account. Skipped until hydration has finished, or
+        // the first render would race the GET and could push stale local values
+        // over newer server ones.
+        if (!hydrated.current || !readStored(TOKEN_KEY)) return;
+        const body = {
+            estimated: prefs.estimated,
+            dateStyle: prefs.dateStyle,
+            defaultPeriod: prefs.defaultPeriod,
+            theme: prefs.theme,
+        };
+        const next = JSON.stringify(body);
+        if (next === synced.current) return;
+        synced.current = next;
+        savePreferences(body).catch((err) => {
+            // Deliberately silent to the user. The control has already moved and
+            // localStorage already has it; an error toast over a cosmetic
+            // preference would be more disruptive than the drift it reports.
+            synced.current = null;      // let the next change retry
+            console.warn("display preferences not saved to your account:", err.message);
+        });
     }, [prefs]);
 
     const set = useCallback((patch) => setPrefs((p) => ({ ...p, ...patch })), []);

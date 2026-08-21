@@ -51,3 +51,25 @@ export const downloadExpensesCsv = async () => {
     a.remove();
     URL.revokeObjectURL(url);
 };
+
+/* ---------------------------------------------------------------- danger zone
+   Both take the acting admin's own password, and both need it in the request
+   BODY. For a DELETE that means axios's `{ data: ... }` config option, not a
+   second positional argument - axios reads argument two of `delete` as config,
+   so passing the object directly would send an empty body and the server would
+   answer "Enter your password to confirm".
+   ---------------------------------------------------------------------------- */
+
+// Every expense in the organisation. Logins, names, roles and preferences all
+// survive - this only clears spending records.
+export const resetAllExpenses = async (password) => {
+    const { data } = await api.delete("/admin/expenses", { data: { password } });
+    return data;
+};
+
+// One named account, and its expenses with it. The server refuses your own id
+// and refuses the last remaining administrator.
+export const deleteUserAccount = async (id, password) => {
+    const { data } = await api.delete(`/admin/people/${id}`, { data: { password } });
+    return data;
+};
