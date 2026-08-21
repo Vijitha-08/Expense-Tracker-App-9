@@ -11,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import UserRegister from "./pages/UserRegister";
 import AdminRegister from "./pages/AdminRegister";
 import UserDashboard from "./pages/UserDashboard";
+import UserReminders from "./pages/UserReminders";
 import UserSettings from "./pages/UserSettings";
 
 import AdminDashboard from "./pages/AdminDashboard";
@@ -24,9 +25,10 @@ import "./App.css";
 
 // Each admin page is its own route rather than a tab inside one component, so
 // the sidebar can highlight the current section and a link is shareable. The
-// user side now has two pages for the same reason, listed the same way.
+// user side has three pages for the same reason, listed the same way.
 const userPages = [
   { path: "dashboard", Page: UserDashboard },
+  { path: "reminders", Page: UserReminders },
   { path: "settings",  Page: UserSettings },
 ];
 

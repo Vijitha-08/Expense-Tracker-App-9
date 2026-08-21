@@ -1459,3 +1459,115 @@
 @media (max-width: 620px) {
     .dash .dash-set-form .form-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================================
+   EXPENSE REMINDERS  (/user/reminders)
+   ------------------------------------------------------------
+   Almost nothing here is new. The page is built from the components this file
+   already defines - `.panel`, `.stat-card`, `.table-wrap` + `.expense-table`,
+   `.dash-switch`, `.dash-set-form`, `.btn-tiny`, `.dash-note`, `.empty-state` -
+   because a reminders page that looked like a different app would be a worse
+   answer than one that looks like the rest of it.
+
+   What is added is the four things the existing vocabulary had no shape for: a
+   status pill, a dimmed row for a reminder that is switched off, the inline
+   settings row the Edit button opens, and the alignment fix that lets a switch
+   sit in a table cell beside two buttons.
+
+   NOT A SINGLE LITERAL COLOUR. Every value below is a token, so dark mode needs
+   no block of its own: `App.css` remaps --warn / --ok / --accent / --border and
+   the rest for `.dash` under `:root[data-theme="dark"]`, and these rules follow.
+   That is also why the pill borders use the matching --*-line token rather than
+   a flat --border - on the dark surface a neutral hairline round a coloured wash
+   reads as a seam.
+   ============================================================ */
+
+/* The status column. Same geometry as `.cat-chip` directly above - this is the
+   same kind of object, a small stated fact on a table row, and two pill shapes a
+   few columns apart is the drift `.expense-table`'s own comment warns about. */
+.dash .rem-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+/* Due now is amber, not red: a bill coming round is a thing to look at, not a
+   failure. Red is reserved for --bad, which on this page means Remove. */
+.dash .rem-due       { background: var(--warn-wash);   color: var(--warn);   border-color: var(--warn-line); }
+.dash .rem-scheduled { background: var(--accent-wash); color: var(--accent); border-color: var(--accent-line); }
+.dash .rem-sent      { background: var(--ok-wash);     color: var(--ok);     border-color: var(--ok-line); }
+/* Off is deliberately colourless - it is the absence of a state, and giving it a
+   hue would make a switched-off reminder compete for attention with a live one. */
+.dash .rem-off       { background: var(--page-alt);    color: var(--muted);  border-color: var(--border); }
+
+/* A switched-off reminder stays in the table - you have to be able to switch it
+   back on - so it is dimmed rather than hidden. Opacity on the row, not colour
+   changes per cell: it fades the amount, the dates and the pill together, and it
+   cannot fall out of step with the pill's own colours.
+   .72, not lower: the row still has to be readable enough to find, and the
+   switch inside it is excluded so the control you need is at full strength. */
+.dash .rem-row-off > td { opacity: .72; }
+.dash .rem-row-off .dash-switch,
+.dash .rem-row-off .btn { opacity: 1; }
+
+/* `.action-row` is `justify-content: flex-end` with a 6px gap, which is right for
+   two buttons and wrong for a 34x20 switch beside them - the switch sat on the
+   text baseline. Centred, and given a little more room, because the switch is a
+   different height from a `.btn-tiny`. */
+.dash .rem-actions { align-items: center; gap: 8px; }
+
+/* The editor the Edit button opens.
+   WHY IT IS NOT A ROW IN THE TABLE. It began as a <tr> with colSpan, which read
+   well on a laptop and was unusable on a phone: `.expense-table` is min-width
+   720px inside a scrolling wrapper, so the editor was 720px wide too, and
+   reaching Edit means scrolling right - which put its labels off the left edge
+   of the screen. It now sits below the table, where one implementation works at
+   every width.
+   `background: var(--field)` is the same tint `.expense-table tbody tr:hover`
+   uses, so the card reads as part of the table above it rather than a new
+   section. */
+.dash .rem-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 18px 16px 20px;
+    background: var(--field);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    /* An INSET shadow for the accent edge, not a 3px border-left: `.dash` sets
+       box-sizing: border-box, so a real border would eat 3px of the padding box
+       and shift every control inside by 3px the moment the editor opens. */
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+.dash .rem-edit-title { margin: 0; font-size: 13px; color: var(--muted); }
+.dash .rem-edit-title strong { color: var(--ink); font-weight: 700; }
+/* `.dash .form-actions` has no margin of its own; inside a flex column with a
+   gap it needs none, and the `.rem-edit` gap above already spaces it. */
+
+/* Which row the editor below belongs to. `.expense-table tbody tr:hover` uses
+   the same --field tint, so this is the hover state made persistent - the row
+   you are working on stays lit even after the pointer leaves it. */
+.dash .rem-row-editing > td { background: var(--field); }
+
+/* ------------------------------------------------------------
+   Narrow screens
+   ------------------------------------------------------------
+   The table itself needs nothing: `.table-wrap` scrolls horizontally and
+   `.expense-table` has `min-width: 720px`, which is this file's own stated
+   answer for tables on a phone ("a table squeezed into 360px wraps every cell
+   into an unreadable column"). Six columns here, so it behaves exactly like the
+   expense table on the dashboard.
+
+   What DOES need help is the editor inside it. `.rem-edit` sits in a cell on a
+   720px-wide table, so its `.form-row` keeps two columns however narrow the
+   phone is - two selects with about 90px each. The `@media (max-width: 620px)`
+   rule further up this file only covers `.dash-set-form .form-row`, and this one
+   is not in a `.dash-set-form`.
+   ------------------------------------------------------------ */
+@media (max-width: 620px) {
+    .dash .rem-edit .form-row { grid-template-columns: minmax(0, 1fr); }
+}

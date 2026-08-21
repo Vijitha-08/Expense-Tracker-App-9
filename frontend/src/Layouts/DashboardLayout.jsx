@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link, NavLink } from "react-router-dom";
 import {
     FiTrendingUp, FiLogOut, FiSun, FiMoon, FiMenu, FiX,
-    FiGrid, FiSettings,
+    FiGrid, FiSettings, FiBell,
 } from "react-icons/fi";
 import { useAuth } from "../context/useAuth";
 import { useDisplay } from "../context/useDisplay";
@@ -17,12 +17,17 @@ const ROLE_LABEL = { admin: "Administrator", user: "User" };
 // notices the first time they resize a window with both open.
 const NAV_BREAKPOINT = 860;
 
-// Two pages, listed here rather than hard-coded in the markup so a third one is
-// one line. Grouped under a heading the way the admin nav is, because the shape
-// has to survive a second group being added.
+// Listed here rather than hard-coded in the markup so another page is one line -
+// which is exactly what Reminders was. Grouped under a heading the way the admin
+// nav is, because the shape has to survive a second group being added.
+//
+// Reminders sits between the two on purpose: Dashboard and Reminders are both
+// places you do something with your expenses, and Settings is configuration, so
+// it stays last.
 const NAV = [
     { group: "Overview", items: [
         { to: "/user/dashboard", label: "Dashboard", Icon: FiGrid },
+        { to: "/user/reminders", label: "Reminders", Icon: FiBell },
         { to: "/user/settings",  label: "Settings",  Icon: FiSettings },
     ]},
 ];
